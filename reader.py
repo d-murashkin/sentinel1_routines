@@ -14,11 +14,12 @@ import os
 import tempfile
 from zipfile import ZipFile
 from xml.etree import ElementTree
-from datetime import datetime, timedelta
+from datetime import datetime
 from multiprocessing.pool import ThreadPool
 
 import numpy as np
-from scipy.interpolate import RectBivariateSpline, griddata, interp1d
+from scipy.interpolate import RectBivariateSpline
+from scipy.interpolate import griddata
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None   # turn off the warning about large image size
 
@@ -58,14 +59,12 @@ class Sentinel1Band(object):
         self.P = 502
 
     def read_data(self):
- #        self.data = imread(self.data_path, mode='I').astype(np.float32)
         self.data = np.array(Image.open(self.data_path), dtype=np.float32)
-        print(self.data.shape)
         self.X, self.Y = self.data.shape
         self.nodata_mask = np.where(self.data == 0, True, False)
 
     def read_noise(self):
-        """ Read noise table from the band noise file, interpolate it for entire image.
+        """ Read noise table from the band noise file, interpolate it for the entire image.
             self.noise has same shape as self.data
         """
         if not hasattr(self, 'X') or not hasattr(self, 'Y'):
@@ -126,39 +125,6 @@ class Sentinel1Band(object):
         y_new = np.arange(0, self.Y, 1, dtype=np.int16)
         self.calibration = gamma_interp(x_new, y_new).astype(np.float32)
 
-    def read_geolocation_grid(self):
-        """ Read Geolocation Grid. For each grid cell the following parameters are given:
-            [azimuth time, slant range time, line, pixel, latitude, longitude, height,
-            incidence angle, elevation angle]
-        """
-        annotation_file = ElementTree.parse(self.annotation_path).getroot()
-        self.geolocation_grid = [{'azimuth_time': datetime.strptime(i[0].text, "%Y-%m-%dT%H:%M:%S.%f"),
-                                  'slant_range_time': float(i[1].text),
-                                  'line': int(i[2].text),
-                                  'pixel': int(i[3].text),
-                                  'latitude': float(i[4].text),
-                                  'longitude': float(i[5].text),
-                                  'height': float(i[6].text),
-                                  'incidence_angle': float(i[7].text),
-                                  'elevation_angle': float(i[8].text),
-                                  } for i in annotation_file[7][0]]
-
-    def interp_elevation_angle(self):
-        """ Interpolate elevation angle information from annotation for entire image.
-            Grid is assumed to be rectangular, 21 cell in width
-        """
-        if not hasattr(self, 'geolocation_grid'):
-            print('Read Geolocation Grid first.')
-            return False
-
-        line_list = np.array([i['line'] for i in self.geolocation_grid])
-        pixel_list = np.array([i['pixel'] for i in self.geolocation_grid])
-        elevation_angle = np.array([i['elevation_angle'] for i in self.geolocation_grid])
-        lines = line_list[::21]
-        pixels = pixel_list[:21]
-        elevation_angle_interp = RectBivariateSpline(lines, pixels, elevation_angle.reshape((len(lines), len(pixels))), kx=1, ky=1)
-        self.elevation_angle = elevation_angle_interp(np.arange(self.X), np.arange(self.Y)).astype(np.float32)
-
     def subtract_noise(self):
         """ Calibrated and denoised data is equal to
             (data**2 - Noise) / Calibration**2
@@ -207,8 +173,9 @@ class Sentinel1Band(object):
         self.data *= (self.img_max - self.img_min)
         self.data += self.img_min
 
-    def incidence_angle_correction(self):
-        self.data = self.data + 0.049 * (self.elevation_angle - self.elevation_angle.min())
+    def incidence_angle_correction(self, elevation_angle):
+#        self.data = self.data + 0.049 * (self.elevation_angle - self.elevation_angle.min())
+        self.data = self.data + 0.049 * (elevation_angle - elevation_angle.min())
 
     def remove_useless_data(self):
         self.calibration = None
@@ -270,7 +237,6 @@ class Sentinel1Product(object):
         self.cut_top = False
 
     def detect_borders(self):
-        """ NOT CHECKED """
         """ Detect noise next to the vertical borders of a given image.
             Set different thresholds for HH and HV bands since amplitude of measurements is different.
             Return border coordinates, that can be used for slising: img[min_lim:max_lim] returns
@@ -278,33 +244,29 @@ class Sentinel1Product(object):
         """
         """ Set thresholds to 100 for HH and 40 for HV band, check 200 columns from edges """
         if hasattr(self.HH, 'data'):
-            HH_mean = self.HH.data.mean(axis=0)
-            try:
-                HH_min_lim = np.where(HH_mean[:200] < 100)[0][-1]
-            except:
-                HH_min_lim = None
-            try:
-                HH_max_lim = HH_mean.shape[0] - 200 + np.where(HH_mean[-200:] < 100)[0][0]
-            except:
-                HH_max_lim = None
+            hh_left_lim, hh_right_lim = self._find_border_coordinates(self.HH, 100)
         else:
-            HH_min_lim = HH_max_lim = None
+            hh_left_lim = hh_right_lim = None
 
         if hasattr(self.HV, 'data'):
-            HV_mean = self.HV.data.mean(axis=0)
-            try:
-                HV_min_lim = np.where(HV_mean[:200] < 100)[0][-1]
-            except:
-                HV_min_lim = None
-            try:
-                HV_max_lim = HV_mean.shape[0] - 200 + np.where(HV_mean[-200:] < 100)[0][0]
-            except:
-                HV_max_lim = None
+            hv_left_lim, hv_right_lim = self._find_border_coordinates(self.HV, 40)
         else:
-            HV_min_lim = HV_max_lim = None
+            hv_left_lim = hv_right_lim = None
 
-        self.x_min = max(HH_min_lim, HV_min_lim)
-        self.x_max = min(HH_max_lim, HV_max_lim)
+        self.x_min = max(hh_left_lim, hv_left_lim)
+        self.x_max = min(hh_right_lim, hv_right_lim)
+    
+    def _find_border_coordinates(self, band_object, threshold_value):
+        hh_vertical_means = self.HH.data.mean(axis=0)
+        try:
+            hh_left_lim = np.where(hh_vertical_means[:200] < threshold_value)[0][-1]
+        except:
+            hh_left_lim = None
+        try:
+            hh_right_lim = hh_vertical_means.shape[0] - 200 + np.where(hh_vertical_means[-200:] < 100)[0][0]
+        except:
+            hh_right_lim = None
+        return hh_left_lim, hh_right_lim
 
     def read_GCPs(self):
         """ Parse Ground Control Points (GCPs) from the annotation file.
@@ -315,16 +277,22 @@ class Sentinel1Product(object):
         elif hasattr(self.HV, 'data'):
             band = self.HV
         else:
-            print('Read HH or HV band data first.')
+            print('Read HH or HV band data before reading GCPs.')
             return False
-        coord_root = ElementTree.parse(band.annotation_path).getroot()
-        self.GCPs = [{'line': int(i[2].text),
+        annotation_file = ElementTree.parse(band.annotation_path).getroot()
+        self.GCPs = [{'azimuth_time': datetime.strptime(i[0].text, "%Y-%m-%dT%H:%M:%S.%f"),
+                      'slant_range_time': float(i[1].text),
+                      'line': int(i[2].text),
                       'pixel': int(i[3].text),
                       'latitude': float(i[4].text),
-                      'longitude': float(i[5].text)} for i in coord_root[7][0]]
+                      'longitude': float(i[5].text),
+                      'height': float(i[6].text),
+                      'incidence_angle': float(i[7].text),
+                      'elevation_angle': float(i[8].text),
+                      } for i in annotation_file[7][0]]
         return True
-    
-    def interpolate_geolocation_grid(self, gcps_per_line=21):
+
+    def interpolate_GCP_parameter(self, parameter, gcps_per_line=21):
         """ Calculate coordinates for every pixel.
             Geolocation grid is interpolated linearly.
             Normally *gcps_per_line* should not be modified.
@@ -332,42 +300,38 @@ class Sentinel1Product(object):
         """
         if not hasattr(self, 'GCPs'):
             self.read_GCPs()
-        if self.GCPs.shape[0] % gcps_per_line != 0:
+        if len(self.GCPs) % gcps_per_line != 0:
             print("Number of GCPs is not multiple of {0}.".format(gcps_per_line))
             print("Please, specify a different value for *gcps_per_line*.")
             return False
         ran = int(len(self.GCPs) / gcps_per_line)
-        xs = np.array([i['line'] for i in self.GCPs][::gcps_per_line])
-        ys = np.array([i['pixel'] for i in self.GCPs][:gcps_per_line, 1])
-        lats = np.array([i['latitude'] for i in self.GCPs])
-        lons = np.array([i['longitude'] for i in self.GCPs])
-        lat_spline = RectBivariateSpline(xs, ys, lats.reshape(ran, gcps_per_line), kx=1, ky=1)
-        lon_spline = RectBivariateSpline(xs, ys, lons.reshape(ran, gcps_per_line), kx=1, ky=1)
+        xs = np.array([i['line'] for i in self.GCPs])[::gcps_per_line]
+        ys = np.array([i['pixel'] for i in self.GCPs])[:gcps_per_line]
+        
+        gcp_data = np.array([i[parameter] for i in self.GCPs])
+        gcp_data_spline = RectBivariateSpline(xs, ys, gcp_data.reshape(ran, gcps_per_line), kx=1, ky=1)
         x_new = np.arange(0, self.HH.X, 1, dtype=np.int16)
         y_new = np.arange(0, self.HH.Y, 1, dtype=np.int16)
-        self.lon_array = lon_spline(x_new, y_new)
-        self.lat_array = lat_spline(x_new, y_new)
+        setattr(self, parameter, gcp_data_spline(x_new, y_new))
         return True
+    
+    def interpolate_latitude(self, gcps_per_line=21):
+        self.interpolate_GCP_parameter('latitude', gcps_per_line=gcps_per_line)
 
-    def create_landmask(self):
-        """ NOT CHECKED """
-        """ Create a masked array with landmask for given image.
-        """
-        from mpl_toolkits.basemap import maskoceans
-        if hasattr(self.HH, 'data'):
-            band = self.HH
-        elif hasattr(self.HV, 'data'):
-            band = self.HV
-        else:
-            print('Read HH or HV band data first.')
-            return False
-        result = maskoceans(self.lon_list, self.lat_list, band.data, resolution='f', grid=1.25)
-        self.landmask = ~result.mask
-        return True
+    def interpolate_longitude(self, gcps_per_line=21):
+        self.interpolate_GCP_parameter('longitude', gcps_per_line=gcps_per_line)
 
+    def interpolate_height(self, gcps_per_line=21):
+        self.interpolate_GCP_parameter('height', gcps_per_line=gcps_per_line)
+
+    def interpolate_elevation_angle(self, gcps_per_line=21):
+        self.interpolate_GCP_parameter('elevation_angle', gcps_per_line=gcps_per_line)
+
+    def interpolate_incidence_angle(self, gcps_per_line=21):
+        self.interpolate_GCP_parameter('incidence_angle', gcps_per_line=gcps_per_line)
+    
     def is_shifted(self):
-        """ NOT CHECKED """
-        """ Check if first lines of swaths ara shifted relative to each other
+        """ Check if first lines of swaths ara shifted relative to each other (black steps on top or at the bottom of the image)
         """
         if hasattr(self.HH, 'data'):
             self.shifted = True if self.HH.data[:400, -1500:].mean() < 100 else False
@@ -381,8 +345,7 @@ class Sentinel1Product(object):
         self.HV.shifted = True if self.shifted else False
         return True
 
-    def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True):
-        """ NOT CHECKED """
+    def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True, parallel=False):
         """ Shortcut for reading data, noise, calibration, preprocessing (borders removal and
             noise subtraction)
         """
@@ -392,37 +355,34 @@ class Sentinel1Product(object):
             band_list = [self.HH]
         elif band.lower() == 'hv':
             band_list = [self.HV]
-
-        [_read_single_band(bnd) for bnd in band_list]
+        
+        if not parallel:
+            list(map(_read_single_band, band_list))
+#            [_read_single_band(bnd) for bnd in band_list]
+        else:
+            pool = ThreadPool(2)
+            pool.map(_read_single_band, band_list)
+            pool.close()
+            pool.join()
+        
         _crop_product(self, keep_useless_data)
         return True
 
     def read_data_p(self, incidence_angle_correction=True, keep_useless_data=True):
-        """ NOT CHECKED """
-        """ Reading data in 2 threads (1 per band), works only with 2 bands, normalization is not
-            supported (can be done manually after data is read, if needed)
+        """ Do not use it. Use read_data() with parallel=True instead
         """
-        band_list = [self.HH, self.HV]
-
-        pool = ThreadPool(2)
-        pool.map(_read_single_band, band_list)
-        pool.close()
-        pool.join()
-
-        _crop_product(self, keep_useless_data)
+        self.read_data(self, incidence_angle_correction=incidence_angle_correction, keep_useless_data=keep_useless_data, parallel=True)
         return True
 
 
 def _read_single_band(band):
-    """ NOT CHECKED """
     band.read_data()
     band.read_noise()
     band.read_calibration()
-    band.read_geolocation_grid()
-    band.interp_elevation_angle()
     band.subtract_noise()
-    if band.des.lower() == 'hh':
-        band.incidence_angle_correction()
+    """ Temporary turn off the incidence angle correction for the HH band """
+#    if band.des.lower() == 'hh':
+#        band.incidence_angle_correction()
     band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
     nofinite_data_val = -4.6
     band.data[band.nofinite_data_mask] = nofinite_data_val
@@ -430,11 +390,17 @@ def _read_single_band(band):
 
 
 def _crop_product(product, keep_useless_data):
-    """ NOT CHECKED """
-    product.parse_lat_lon()
+    product.read_GCPs()
+    product.interpolate_latitude()
+    product.interpolate_longitude()
+    product.interpolate_elevation_angle()
+#    product.interpolate_incidence_angle()
     product.detect_borders()
-    product.lat_list = product.lat_list[:, product.x_min:product.x_max]
-    product.lon_list = product.lon_list[:, product.x_min:product.x_max]
+
+    product.latitude = product.latitude[:, product.x_min:product.x_max]
+    product.longitude = product.longitude[:, product.x_min:product.x_max]
+    product.elevation_angle = product.elevation_angle[:, product.x_min:product.x_max]
+#    product.incidence_angle = product.incidence_angle[:, product.x_min:product.x_max]
 
     for band in [product.HH, product.HV]:
         if not keep_useless_data:
@@ -442,11 +408,11 @@ def _crop_product(product, keep_useless_data):
         else:
             band.noise = band.noise[:, product.x_min:product.x_max]
             band.calibration = band.calibration[:, product.x_min:product.x_max]
-            band.elevation_angle = band.elevation_angle[:, product.x_min:product.x_max]
         band.data = band.data[:, product.x_min:product.x_max]
 
 
 if __name__ == '__main__':
     pass
     p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
-    p.read_data_p()
+    # p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/SAFE/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.SAFE/')
+    p.read_data(parallel=False)
