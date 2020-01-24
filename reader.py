@@ -174,7 +174,6 @@ class Sentinel1Band(object):
         self.data += self.img_min
 
     def incidence_angle_correction(self, elevation_angle):
-#        self.data = self.data + 0.049 * (self.elevation_angle - self.elevation_angle.min())
         self.data = self.data + 0.049 * (elevation_angle - elevation_angle.min())
 
     def remove_useless_data(self):
@@ -346,8 +345,7 @@ class Sentinel1Product(object):
         return True
 
     def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True, parallel=False):
-        """ Shortcut for reading data, noise, calibration, preprocessing (borders removal and
-            noise subtraction)
+        """ Shortcut for reading data, noise, calibration, and noise subtraction)
         """
         if band.lower() == 'both':
             band_list = [self.HH, self.HV]
@@ -358,14 +356,12 @@ class Sentinel1Product(object):
         
         if not parallel:
             list(map(_read_single_band, band_list))
-#            [_read_single_band(bnd) for bnd in band_list]
         else:
             pool = ThreadPool(2)
             pool.map(_read_single_band, band_list)
             pool.close()
             pool.join()
         
-        _crop_product(self, keep_useless_data)
         return True
 
     def read_data_p(self, incidence_angle_correction=True, keep_useless_data=True):
@@ -373,46 +369,40 @@ class Sentinel1Product(object):
         """
         self.read_data(self, incidence_angle_correction=incidence_angle_correction, keep_useless_data=keep_useless_data, parallel=True)
         return True
-
+    
+    def crop_borders(self):
+        """ Remove "dirty" pixels on the left and the right sides of the project.
+            The pixels are cut on all of the following (if exists):
+                * band data
+                * latitude
+                * longitude
+                * elevation angle
+                * incidence angle
+                * height
+            Therefore this function should be called after all the needed parameters are read and interpolated.
+        """
+        self.detect_borders()
+        for item in ['latitude', 'longitude', 'elevation_angle', 'incidence_angle', 'height']:
+            if hasattr(self, item):
+                setattr(self, item, getattr(self, item)[:, self.x_min:self.x_max])
+        for band in [self.HH, self.HV]:
+            for item in ['data', 'noise', 'calibration']:
+                if hasattr(band, item):
+                    setattr(band, item, getattr(band, item)[:, self.x_min:self.x_max])
+    
 
 def _read_single_band(band):
     band.read_data()
     band.read_noise()
     band.read_calibration()
     band.subtract_noise()
-    """ Temporary turn off the incidence angle correction for the HH band """
-#    if band.des.lower() == 'hh':
-#        band.incidence_angle_correction()
     band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
     nofinite_data_val = -4.6
     band.data[band.nofinite_data_mask] = nofinite_data_val
     return True
 
 
-def _crop_product(product, keep_useless_data):
-    product.read_GCPs()
-    product.interpolate_latitude()
-    product.interpolate_longitude()
-    product.interpolate_elevation_angle()
-#    product.interpolate_incidence_angle()
-    product.detect_borders()
-
-    product.latitude = product.latitude[:, product.x_min:product.x_max]
-    product.longitude = product.longitude[:, product.x_min:product.x_max]
-    product.elevation_angle = product.elevation_angle[:, product.x_min:product.x_max]
-#    product.incidence_angle = product.incidence_angle[:, product.x_min:product.x_max]
-
-    for band in [product.HH, product.HV]:
-        if not keep_useless_data:
-            band.remove_useless_data()
-        else:
-            band.noise = band.noise[:, product.x_min:product.x_max]
-            band.calibration = band.calibration[:, product.x_min:product.x_max]
-        band.data = band.data[:, product.x_min:product.x_max]
-
-
 if __name__ == '__main__':
     pass
-    p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
-    # p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/SAFE/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.SAFE/')
+    p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/SAFE/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.SAFE/')
     p.read_data(parallel=False)
