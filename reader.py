@@ -20,6 +20,7 @@ from multiprocessing.pool import ThreadPool
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import griddata
+from scipy.interpolate import interp1d
 from PIL import Image
 Image.MAX_IMAGE_PIXELS = None   # turn off the warning about large image size
 
@@ -63,7 +64,7 @@ class Sentinel1Band(object):
         self.X, self.Y = self.data.shape
         self.nodata_mask = np.where(self.data == 0, True, False)
 
-    def read_noise(self):
+    def read_noise(self, azimuth_noise=True):
         """ Read noise table from the band noise file, interpolate it for the entire image.
             self.noise has same shape as self.data
         """
@@ -71,6 +72,7 @@ class Sentinel1Band(object):
             print('Read data first.')
             return False
 
+        """ First, deal with noise in the range direction. """
         noise_file = ElementTree.parse(self.noise_path).getroot()
         noise = np.array([j for i in noise_file[1] for j in i[3].text.split(' ')], dtype=np.float32)
         noise_y = np.array([j for i in noise_file[1] for j in i[2].text.split(' ')], dtype=np.int16)
@@ -96,6 +98,28 @@ class Sentinel1Band(object):
             cf = ElementTree.parse(self.calibration_path).getroot()
             DN = float(cf[2][0][6].text.split(' ')[0])
             self.noise *= 56065.87 * DN
+        
+        """ Second, take into account noise in the azimuth direction (if possible).
+            According https://qc.sentinel1.eo.esa.int/ipf/ only products taken after 13 March 2018 containg this information. """
+        if azimuth_noise:
+            try:
+                self.read_azimuth_noise()
+                self.noise *= self.azimuth_noise
+            except:
+                print('Failed to read azimuth noise.')
+    
+    def read_azimuth_noise(self):
+        """ Read scalloping noise data """
+        noise_file = ElementTree.parse(self.noise_path).getroot()
+        self.scalloping_lut = [{'line_min': int(i[1].text), 'line_max': int(i[3].text), 'sample_min': int(i[2].text), 'sample_max': int(i[4].text),
+                                'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
+
+        """ Interpolate scalloping noise """
+        self.azimuth_noise = np.zeros((self.X, self.Y))
+        for patch in self.scalloping_lut:
+            scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
+            noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
+            self.azimuth_noise[patch['line_min']:patch['line_max'] + 1, patch['sample_min']:patch['sample_max'] + 1] = noise_line[:, np.newaxis]
 
     def read_calibration(self):
         """ Read calibration table from product folder.
