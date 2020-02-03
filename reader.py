@@ -11,11 +11,11 @@ NOTE: currently incidence angle correction can not be turned off for HH band.
 @author: Dmitrii Murashkin
 """
 import os
-import tempfile
-from zipfile import ZipFile
+import zipfile
 from xml.etree import ElementTree
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
+from io import BytesIO
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
@@ -27,40 +27,41 @@ Image.MAX_IMAGE_PIXELS = None   # turn off the warning about large image size
 
 class Sentinel1Band(object):
     """ Represents a Sentinel-1 band of a Sentinel-1 product.
+        It is initialized with paths for data, annotation, calibration and noise files as well as with the band name.
         It has the following attributes:
-            product_folder
-            band_name - full band name (filename containing the band without extention)
             des - band designator or short name: 'hh' or 'hv'
-            data_path - path to the tiff file that contains band data
-            noise_path - path to the xml file that contains noise LUT
-            calibration_path - path to the xml file thant containes calibration parameters LUT
-            annotation_path - path to the xml file with annotation
-            denoised - if data has been denoised (to prevent double noise removal)
-            P - Period of scalloping noise in pixel. Probably, useless information.
+            data_path - path to the tiff file that contains band data (or a ZipExtFile instance)
+            noise_path - path to the xml file that contains noise LUT (or a ZipExtFile instance)
+            calibration_path - path to the xml file thant containes calibration parameters LUT (or a ZipExtFile instance)
+            annotation_path - path to the xml file with annotation (or a ZipExtFile instance)
+            denoised - flag, showing if data has been denoised (to prevent double noise removal)
             Image band max and min values are taken from kmeans cluster analysis of a set of images.
                 For more information look into 'gray_level_reduction.py'
-        It has the following methods:
-            read_data(self) -- should be executed first
-            read_noise(self)
-            read_calibration(self)
-            subtract_noise(self)
-            scalloping_noise(self) -- not completed yet
+        The following methods are available:
+            read_data() -- should be executed first
+            read_noise()
+            read_calibration()
+            subtract_noise()
+            incidence_angle_correction(elevation_angle)
     """
-    def __init__(self, product_path, band_name):
-        self.product_folder = product_path
-        self.band_name = band_name
-        self.des = 'hh' if '-hh-' in band_name.lower() else 'hv'
+    def __init__(self, data_path, annotation_path, calibration_path, noist_path, band_name):
+        self.des = band_name.lower()
         self.img_max = 0.9541868 if self.des == 'hh' else -0.13850354
         self.img_min = -6.71286583 if self.des == 'hh' else -7.38279407
-        self.data_path = self.product_folder + 'measurement/' + self.band_name + 'tiff'
-        self.noise_path = self.product_folder + 'annotation/calibration/noise-' + self.band_name + 'xml'
-        self.calibration_path = self.product_folder + 'annotation/calibration/calibration-' + self.band_name + 'xml'
-        self.annotation_path = self.product_folder + 'annotation/' + self.band_name + 'xml'
+        self.data_path = data_path
+        self.noise_path = noist_path
+        self.calibration_path = calibration_path
+        self.annotation_path = annotation_path
         self.denoised = False
-        self.P = 502
 
     def read_data(self):
-        self.data = np.array(Image.open(self.data_path), dtype=np.float32)
+        if type(self.data_path) is str:
+            data = Image.open(self.data_path)
+        else:
+            unziped_bytes = BytesIO(self.data_path.read())
+            data = Image.open(unziped_bytes)
+        self.data = np.array(data, dtype=np.float32)
+        self.denoised = False
         self.X, self.Y = self.data.shape
         self.nodata_mask = np.where(self.data == 0, True, False)
 
@@ -103,14 +104,16 @@ class Sentinel1Band(object):
             According https://qc.sentinel1.eo.esa.int/ipf/ only products taken after 13 March 2018 containg this information. """
         if azimuth_noise:
             try:
-                self.read_azimuth_noise()
+                self._read_azimuth_noise(noise_file)
                 self.noise *= self.azimuth_noise
             except:
                 print('Failed to read azimuth noise.')
     
-    def read_azimuth_noise(self):
-        """ Read scalloping noise data """
-        noise_file = ElementTree.parse(self.noise_path).getroot()
+    def _read_azimuth_noise(self, noise_file):
+        """ Read scalloping noise data.
+            The noise file should be passed here for support of zip-archives.
+            If .SAFE folder is used as input for the Sentinel1Product then noise_file can be taken from self.noise_file.
+        """
         self.scalloping_lut = [{'line_min': int(i[1].text), 'line_max': int(i[3].text), 'sample_min': int(i[2].text), 'sample_max': int(i[4].text),
                                 'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
 
@@ -212,52 +215,60 @@ class Sentinel1Product(object):
         Input is expected to be a path to a Sentinel-1 scene (both *.SAFE and *.zip are supported).
     """
     def __init__(self, product_path):
-        """ Init function.
-            Unzip the specied Sentinel-1 scene if needed.
-            Paths to auxilary data are set.
-            Band object(s) is(are) created.
+        """ Set paths to auxilary data.
+            Create Sentinel1Band object for each band in the product.
+            Parse date and time of the product into self.timestamp
         """
-
         """ If *product_path* is a folder, set path to data and auxilary data,
             otherwise unpack it first (create tmp_folder if it does not exist)
         """
+        def _band_number(x):
+            """ Function expects a .xml filename from Sentinel-1 product folder.
+                It returns the band number (the last character before the file extention, *00<band_num>.xml or *00<band_num>.tiff)
+            """
+            return int(os.path.split(x)[1].split('.')[0][-1])
+
         if os.path.isdir(product_path):
-            self.product_folder = os.path.abspath(product_path) + '/'
-        elif os.path.isfile(product_path):
-            self.tmp_folder = tempfile.TemporaryDirectory()
-            try:
-                zipdata = ZipFile(product_path)
-                zipdata.extractall(self.tmp_folder.name)
-                self.product_folder = os.path.join(self.tmp_folder.name, zipdata.namelist()[0])
-            except:
-                print('Zip file reading/extracting error.')
-                return False
-        else:
+            self.product_path = os.path.abspath(product_path)
+            self.data_files = sorted([os.path.join(self.product_path, 'measurement', item) for item in os.listdir(os.path.join(self.product_path, 'measurement'))], key=_band_number)
+            self.annotation_files = sorted([os.path.join(self.product_path, 'annotation', item) for item in os.listdir(os.path.join(self.product_path, 'annotation')) if '.xml' in item], key=_band_number)
+            self.noise_files = sorted([os.path.join(self.product_path, 'annotation', 'calibration', item) for item in os.listdir(os.path.join(self.product_path, 'annotation', 'calibration')) if 'noise' in item], key=_band_number)
+            self.calibration_files = sorted([os.path.join(self.product_path, 'annotation', 'calibration', item) for item in os.listdir(os.path.join(self.product_path, 'annotation', 'calibration')) if 'calibration' in item], key=_band_number)
+        elif not os.path.isfile(product_path):
             print('File {0} does not exist.'.format(product_path))
             return False
-
-        """ Read in-product file names """
-        files = os.listdir(self.product_folder + 'measurement/')
-        if '-hh-' in files[0] and '-hv-' in files[1]:
-            band_name_list = [files[0][:-4], files[1][:-4]]
-        elif '-hh-' in files[1] and '-hv-' in files[0]:
-            band_name_list = [files[1][:-4], files[0][:-4]]
         else:
-            print('Unable to recognize HH and HV bands.')
-
-        """ Create 2 bands: HH and HV """
-        self.HH = Sentinel1Band(self.product_folder, band_name_list[0])
-        self.HV = Sentinel1Band(self.product_folder, band_name_list[1])
+            if not zipfile.is_zipfile(product_path):
+                print('File {0} is not a zip file.'.format(product_path))
+            try:
+                zipdata = zipfile.ZipFile(product_path)
+                data_files = sorted([item for item in zipdata.namelist() if 'measurement' in item and '.tif' in item], key=_band_number)
+                xml_files = [item for item in zipdata.namelist() if '.xml' in item]
+                annotation_files = sorted([item for item in xml_files if 'annotation' in item and 'calibration' not in item], key=_band_number)
+                noise_files = sorted([item for item in xml_files if 'noise' in item], key=_band_number)
+                calibration_files = sorted([item for item in xml_files if 'calibration' in item and 'noise' not in item], key=_band_number)
+                self.data_files = [zipdata.open(item) for item in data_files]
+                self.annotation_files = [zipdata.open(item) for item in annotation_files]
+                self.noise_files = [zipdata.open(item) for item in noise_files]
+                self.calibration_files = [zipdata.open(item) for item in calibration_files]
+            except:
+                print('Zip file reading error.')
+                return False
+        
+        """ Create a Sentinel1Band object for each band in the product. """
+        for d, a, c, n in zip(self.data_files, self.annotation_files, self.calibration_files, self.noise_files):
+            if type(a) == str:
+                name_string = a
+            else:
+                name_string = a.name
+            band_name = os.path.split(name_string)[1].split('-')[3].upper()
+            setattr(self, band_name, Sentinel1Band(d, a, c, n, band_name))
 
         """ Create datetime object """
         try:
-            self.timestamp = datetime.strptime(band_name_list[0].split('-')[4], "%Y%m%dt%H%M%S")
+            self.timestamp = datetime.strptime(self.data_files[0].split('-')[4], "%Y%m%dt%H%M%S")
         except:
             self.timestamp = False
-
-        """ Flags show if top or bottom of the product should be cut. (probably not needeed anymore)"""
-        self.cut_bottom = False
-        self.cut_top = False
 
     def detect_borders(self):
         """ Detect noise next to the vertical borders of a given image.
@@ -339,18 +350,33 @@ class Sentinel1Product(object):
         return True
     
     def interpolate_latitude(self, gcps_per_line=21):
+        if hasattr(self, 'latitude'):
+            print('Latitudes have already been interpolated.')
+            return True
         self.interpolate_GCP_parameter('latitude', gcps_per_line=gcps_per_line)
 
     def interpolate_longitude(self, gcps_per_line=21):
+        if hasattr(self, 'longitude'):
+            print('Longitudes have already been interpolated.')
+            return True
         self.interpolate_GCP_parameter('longitude', gcps_per_line=gcps_per_line)
 
     def interpolate_height(self, gcps_per_line=21):
+        if hasattr(self, 'height'):
+            print('Heights have already been interpolated.')
+            return True
         self.interpolate_GCP_parameter('height', gcps_per_line=gcps_per_line)
 
     def interpolate_elevation_angle(self, gcps_per_line=21):
+        if hasattr(self, 'elevation_angle'):
+            print('Elevation angles have already been interpolated.')
+            return True
         self.interpolate_GCP_parameter('elevation_angle', gcps_per_line=gcps_per_line)
 
     def interpolate_incidence_angle(self, gcps_per_line=21):
+        if hasattr(self, 'incidence_angle'):
+            print('Incidence angles have already been interpolated.')
+            return True
         self.interpolate_GCP_parameter('incidence_angle', gcps_per_line=gcps_per_line)
     
     def is_shifted(self):
@@ -386,6 +412,19 @@ class Sentinel1Product(object):
             pool.close()
             pool.join()
         
+        """ Incidence angle correction for the HH band. """
+        if incidence_angle_correction and hasattr(self, 'HH'):
+            self.read_GCPs()
+            self.interpolate_elevation_angle()
+            self.HH.incidence_angle_correction(self.elevation_angle)
+
+        """ Replace infinits (that appears after noise subtraction and calibration) with nofinite_data_val. """
+        nofinite_data_val = -4.6
+        for band in band_list:
+            band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
+            band.data[band.nofinite_data_mask] = nofinite_data_val
+        
+        self.crop_borders()
         return True
 
     def read_data_p(self, incidence_angle_correction=True, keep_useless_data=True):
@@ -420,13 +459,10 @@ def _read_single_band(band):
     band.read_noise()
     band.read_calibration()
     band.subtract_noise()
-    band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
-    nofinite_data_val = -4.6
-    band.data[band.nofinite_data_mask] = nofinite_data_val
     return True
 
 
 if __name__ == '__main__':
     pass
-    p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/SAFE/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.SAFE/')
-    p.read_data(parallel=False)
+    p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
+    p.read_data(parallel=True)
