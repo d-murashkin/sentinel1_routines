@@ -1,4 +1,6 @@
 Sentinel-1 routines:
-* downloader
 * reader (EW swath products only)
-* plotter (basemap or cartopy)
+
+Routines in plan:
+* downloader (search and download with dhusget.sh script)
+* plotter (basemap, cartopy)
