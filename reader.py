@@ -107,7 +107,7 @@ class Sentinel1Band(object):
                 self._read_azimuth_noise(noise_file)
                 self.noise *= self.azimuth_noise
             except:
-                print('Failed to read azimuth noise.')
+                print('Failed to read azimuth noise (this is normal for Sentinel-1 scenes taken before 13 March 2018).')
     
     def _read_azimuth_noise(self, noise_file):
         """ Read scalloping noise data.
@@ -118,7 +118,7 @@ class Sentinel1Band(object):
                                 'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
 
         """ Interpolate scalloping noise """
-        self.azimuth_noise = np.zeros((self.X, self.Y))
+        self.azimuth_noise = np.zeros((self.X, self.Y), np.float32)
         for patch in self.scalloping_lut:
             scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
             noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
@@ -346,7 +346,7 @@ class Sentinel1Product(object):
         gcp_data_spline = RectBivariateSpline(xs, ys, gcp_data.reshape(ran, gcps_per_line), kx=1, ky=1)
         x_new = np.arange(0, self.HH.X, 1, dtype=np.int16)
         y_new = np.arange(0, self.HH.Y, 1, dtype=np.int16)
-        setattr(self, parameter, gcp_data_spline(x_new, y_new))
+        setattr(self, parameter, gcp_data_spline(x_new, y_new).astype(np.float32))
         return True
     
     def interpolate_latitude(self, gcps_per_line=21):
@@ -464,5 +464,5 @@ def _read_single_band(band):
 
 if __name__ == '__main__':
     pass
-    p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
-    p.read_data(parallel=True)
+    #p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
+    #p.read_data(parallel=True)
