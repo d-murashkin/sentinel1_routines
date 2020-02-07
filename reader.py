@@ -118,11 +118,7 @@ class Sentinel1Band(object):
                                 'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
 
         """ Interpolate scalloping noise """
-<<<<<<< HEAD
-        self.azimuth_noise = np.zeros((self.X, self.Y), np.float32)
-=======
         self.azimuth_noise = np.zeros((self.X, self.Y), dtype=np.float32)
->>>>>>> d35a6bdef8a4d66850c9d55f81bed0614a535d1f
         for patch in self.scalloping_lut:
             scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
             noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
@@ -462,5 +458,3 @@ def _read_single_band(band):
 
 if __name__ == '__main__':
     pass
-    #p = Sentinel1Product('/bffs01/group/users/mura_dm/sea_ice_classification_dataset/sentinel-1/products/zip/S1A_EW_GRDM_1SDH_20200107T033938_20200107T034038_030689_038489_92D9.zip')
-    #p.read_data(parallel=True)
