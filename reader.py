@@ -118,7 +118,11 @@ class Sentinel1Band(object):
                                 'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
 
         """ Interpolate scalloping noise """
+<<<<<<< HEAD
         self.azimuth_noise = np.zeros((self.X, self.Y), np.float32)
+=======
+        self.azimuth_noise = np.zeros((self.X, self.Y), dtype=np.float32)
+>>>>>>> d35a6bdef8a4d66850c9d55f81bed0614a535d1f
         for patch in self.scalloping_lut:
             scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
             noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
@@ -342,7 +346,7 @@ class Sentinel1Product(object):
         xs = np.array([i['line'] for i in self.GCPs])[::gcps_per_line]
         ys = np.array([i['pixel'] for i in self.GCPs])[:gcps_per_line]
         
-        gcp_data = np.array([i[parameter] for i in self.GCPs])
+        gcp_data = np.array([i[parameter] for i in self.GCPs], dtype=np.float32)
         gcp_data_spline = RectBivariateSpline(xs, ys, gcp_data.reshape(ran, gcps_per_line), kx=1, ky=1)
         x_new = np.arange(0, self.HH.X, 1, dtype=np.int16)
         y_new = np.arange(0, self.HH.Y, 1, dtype=np.int16)
@@ -427,12 +431,6 @@ class Sentinel1Product(object):
         self.crop_borders()
         return True
 
-    def read_data_p(self, incidence_angle_correction=True, keep_useless_data=True):
-        """ Do not use it. Use read_data() with parallel=True instead
-        """
-        self.read_data(self, incidence_angle_correction=incidence_angle_correction, keep_useless_data=keep_useless_data, parallel=True)
-        return True
-    
     def crop_borders(self):
         """ Remove "dirty" pixels on the left and the right sides of the project.
             The pixels are cut on all of the following (if exists):
