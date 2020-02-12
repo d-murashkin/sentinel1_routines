@@ -176,19 +176,20 @@ class Sentinel1Band(object):
         else:
             print('Product is already denoised.')
 
-    def normalize(self):
-        """ Data normalization: [0; 1]
+    def normalize(self, output_range=[0, 1]):
+        """ Scale data to output_range.
         """
+        """ Normalize """
         self.data -= self.data.min()
         self.data /= self.data.max()
+        """ Scale to output_range """
+        self.data = self.data * (output_range[1] - output_range[0]) + output_range[0]
 
-    def clip_normalize(self):
+    def clip_normalize(self, output_range=[0, 1]):
         """ Clip data and normalize it
         """
-        self.data[self.data > self.img_max] = self.img_max
-        self.data[self.data < self.img_min] = self.img_min
-        self.data -= self.img_min
-        self.data /= (self.img_max - self.img_min)
+        self.clip()
+        self.normalize(output_range=output_range)
 
     def clip(self):
         self.data[self.data > self.img_max] = self.img_max
