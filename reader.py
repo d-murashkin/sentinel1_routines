@@ -230,6 +230,7 @@ class Sentinel1Product(object):
             return int(os.path.split(x)[1].split('.')[0][-1])
 
         if os.path.isdir(product_path):
+            self.zip = False
             self.product_path = os.path.abspath(product_path)
             self.data_files = sorted([os.path.join(self.product_path, 'measurement', item) for item in os.listdir(os.path.join(self.product_path, 'measurement'))], key=_band_number)
             self.annotation_files = sorted([os.path.join(self.product_path, 'annotation', item) for item in os.listdir(os.path.join(self.product_path, 'annotation')) if '.xml' in item], key=_band_number)
@@ -242,6 +243,7 @@ class Sentinel1Product(object):
             if not zipfile.is_zipfile(product_path):
                 print('File {0} is not a zip file.'.format(product_path))
             try:
+                self.zip = True
                 zipdata = zipfile.ZipFile(product_path)
                 data_files = sorted([item for item in zipdata.namelist() if 'measurement' in item and '.tif' in item], key=_band_number)
                 xml_files = [item for item in zipdata.namelist() if '.xml' in item]
@@ -270,6 +272,19 @@ class Sentinel1Product(object):
             self.timestamp = datetime.strptime(self.data_files[0].split('-')[4], "%Y%m%dt%H%M%S")
         except:
             self.timestamp = False
+        
+        try:
+            import gdal
+            if self.zip:
+                p_gdal = gdal.Open('/vsizip/' + os.path.join(product_path, data_files[0]))
+            else:
+                p_gdal = gdal.Open(self.data_files[0])
+            self.gdal_data = {'X': p_gdal.GetRasterBand(1).XSize,
+                              'Y': p_gdal.GetRasterBand(1).YSize,
+                              'GCPs': p_gdal.GetGCPs(),
+                              'GCP_proj': p_gdal.GetGCPProjection()}
+        except:
+            pass
 
     def detect_borders(self):
         """ Detect noise next to the vertical borders of a given image.
@@ -395,7 +410,7 @@ class Sentinel1Product(object):
         self.HV.shifted = True if self.shifted else False
         return True
 
-    def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True, parallel=False):
+    def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True, parallel=False, crop_borders=True):
         """ Shortcut for reading data, noise, calibration, and noise subtraction)
         """
         if band.lower() == 'both':
@@ -425,7 +440,8 @@ class Sentinel1Product(object):
             band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
             band.data[band.nofinite_data_mask] = nofinite_data_val
         
-        self.crop_borders()
+        if crop_borders:
+            self.crop_borders()
         return True
 
     def crop_borders(self):
