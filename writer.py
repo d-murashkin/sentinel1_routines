@@ -3,6 +3,8 @@
 import gdal
 import numpy as np
 
+from reader import Sentinel1Product
+
 
 def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
     X = gdal_data['X']
@@ -28,6 +30,20 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
         band.WriteArray(np.squeeze(layer))
     
     out.FlushCache()
+
+
+def to_RGB(input_scene, output_path, dec=1):
+    p = Sentinel1Product(input_scene)
+    p.read_data(parallel=True, crop_borders=False)
+    p.HH.clip_normalize()
+    p.HV.clip_normalize()
+    ratio = p.HV.data - p.HH.data
+    ratio -= ratio.min()
+    ratio /= ratio.max()
+    img = np.stack([p.HH.data, p.HV.data, ratio], axis=2)
+    img *= 255
+    img = img.astype(np.uint8)
+    write_data_geotiff(img, output_path, p.gdal_data, dec=dec)
 
 
 if __name__ == "__main__":
