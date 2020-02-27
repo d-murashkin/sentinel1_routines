@@ -6,7 +6,7 @@ from reader import Sentinel1Product
 from writer import write_data_geotiff
 
 
-def to_grayscale(input_path, output_path, band='hh', speckle_filter=True):
+def grayscale(input_path, output_path, band='hh', speckle_filter=True):
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
     p = Sentinel1Product(input_path)
@@ -28,7 +28,7 @@ def to_grayscale(input_path, output_path, band='hh', speckle_filter=True):
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def to_RGB(input_path, output_path, speckle_filter=True):
+def rgb(input_path, output_path, speckle_filter=True):
     p = Sentinel1Product(input_path)
     p.read_data(parallel=True, keep_useless_data=False, crop_borders=False)
     p.HH.clip_normalize()
