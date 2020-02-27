@@ -55,7 +55,7 @@ def calibrated(input_path, output_path, speckle_filter=True):
     """
     p = Sentinel1Product(input_path)
     p.read_data(parallel=True, keep_useless_data=True, crop_borders=False)
-    data = np.stack([p.HH.data, p.HV.data], axis=2)
+    data = np.stack([p.HH.data, p.HV.data], axis=2) * 10 / np.log(10)
     write_data_geotiff(data, output_path, p.gdal_data)
 
 
