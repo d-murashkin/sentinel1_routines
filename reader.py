@@ -223,6 +223,12 @@ class Sentinel1Product(object):
         """ If *product_path* is a folder, set path to data and auxilary data,
             otherwise unpack it first (create tmp_folder if it does not exist)
         """
+        try:
+            self.product_name = os.path.basename(product_path).split('.')[0]
+            print(self.product_path)
+        except:
+            pass
+
         def _band_number(x):
             """ Function expects a .xml filename from Sentinel-1 product folder.
                 It returns the band number (the last character before the file extention, *00<band_num>.xml or *00<band_num>.tiff)
@@ -456,6 +462,8 @@ class Sentinel1Product(object):
             Therefore this function should be called after all the needed parameters are read and interpolated.
         """
         self.detect_borders()
+        self.gdal_data['x_min'] = self.x_min
+        self.gdal_data['x_max'] = self.x_max
         for item in ['latitude', 'longitude', 'elevation_angle', 'incidence_angle', 'height']:
             if hasattr(self, item):
                 setattr(self, item, getattr(self, item)[:, self.x_min:self.x_max])
