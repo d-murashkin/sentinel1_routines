@@ -446,6 +446,9 @@ class Sentinel1Product(object):
             band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
             band.data[band.nofinite_data_mask] = nofinite_data_val
         
+        """ Save nodata mask to self.gdal_data for further data writing. """
+        self.gdal_data['nodata_mask'] = self.HH.nodata_mask
+        
         if crop_borders:
             self.crop_borders()
         return True

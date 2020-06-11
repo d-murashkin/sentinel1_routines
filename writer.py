@@ -50,9 +50,14 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
         if 'x_min' in gdal_data:
             data_to_write = np.full((out_y, out_x), nodata_val, dtype=input_data.dtype)
             data_to_write[:, gdal_data['x_min'] // dec:gdal_data['x_min'] // dec + layer.shape[1]] = np.squeeze(layer)
-            band.WriteArray(data_to_write)
         else:
-            band.WriteArray(np.squeeze(layer))
+            data_to_write = np.squeeze(layer)
+        
+        if 'nodata_mask' in gdal_data:
+            print('apply nodata mask from the original scene')
+            data_to_write[gdal_data['nodata_mask'][::dec, ::dec]] = nodata_val
+
+        band.WriteArray(data_to_write)
     
     out.FlushCache()
 
