@@ -1,4 +1,7 @@
-""" Create a geotiff with GCPs copied from the original Sentinel-1 scene.
+"""
+Create a geotiff with GCPs copied from the original Sentinel-1 scene.
+
+autor: Dmitrii Murashkin
 """
 import gdal
 import numpy as np
@@ -15,7 +18,6 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
     else:
         bands = input_data.shape[2]
         data = input_data
-    print('write to geotiff: original scene size {0}x{1}, data size to write {2}x{3}'.format(X, Y, input_data.shape[0], input_data.shape[1]))
 
     datatype_mapping = {'uint8': gdal.GDT_Byte,
                         'uint16': gdal.GDT_UInt16,
