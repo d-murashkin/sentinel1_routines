@@ -4,7 +4,7 @@ import gdal
 import numpy as np
 
 
-def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
+def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
     X = gdal_data['X']
     Y = gdal_data['Y']
     proj = gdal_data['GCP_proj']
@@ -15,6 +15,7 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
     else:
         bands = input_data.shape[2]
         data = input_data
+    print('write to geotiff: original scene size {0}x{1}, data size to write {2}x{3}'.format(X, Y, input_data.shape[0], input_data.shape[1]))
 
     datatype_mapping = {'uint8': gdal.GDT_Byte,
                         'uint16': gdal.GDT_UInt16,
@@ -34,7 +35,9 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
         return False
 
     driver = gdal.GetDriverByName('GTiff')
-    out = driver.Create(output_path, X // dec + 1 if np.remainder(X, dec) else X // dec, Y // dec + 1 if np.remainder(Y, dec) else Y // dec, bands, datatype, options=['COMPRESS=DEFLATE'])
+    out_x = X // dec + 1 if np.remainder(X, dec) else X // dec
+    out_y = Y // dec + 1 if np.remainder(Y, dec) else Y // dec
+    out = driver.Create(output_path, out_x, out_y, bands, datatype, options=['COMPRESS=DEFLATE'])
     for gcp in gcps:
         gcp.GCPLine /= dec
         gcp.GCPPixel /= dec
@@ -42,7 +45,12 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1):
 
     for n, layer in enumerate(np.split(data, bands, axis=2)):
         band = out.GetRasterBand(n + 1)
-        band.WriteArray(np.squeeze(layer))
+        if 'x_min' in gdal_data:
+            data_to_write = np.full((out_y, out_x), nodata_val, dtype=input_data.dtype)
+            data_to_write[:, gdal_data['x_min'] // dec:gdal_data['x_min'] // dec + layer.shape[1]] = np.squeeze(layer)
+            band.WriteArray(data_to_write)
+        else:
+            band.WriteArray(np.squeeze(layer))
     
     out.FlushCache()
 
