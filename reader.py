@@ -46,8 +46,8 @@ class Sentinel1Band(object):
     """
     def __init__(self, data_path, annotation_path, calibration_path, noist_path, band_name):
         self.des = band_name.lower()
-        self.img_max = 0.9541868 if self.des == 'hh' else -0.13850354
-        self.img_min = -6.71286583 if self.des == 'hh' else -7.38279407
+        self.img_max = 4 if self.des == 'hh' else -15
+        self.img_min = -29 if self.des == 'hh' else -32
         self.data_path = data_path
         self.noise_path = noist_path
         self.calibration_path = calibration_path
@@ -171,25 +171,29 @@ class Sentinel1Band(object):
             self.data = self.data / self.calibration**2
             threshold = 1 / self.calibration.max()
             self.data[self.data < threshold] = threshold
-            self.data = np.log(self.data)
+            self.data = np.log10(self.data) * 10
             self.denoised = True
         else:
             print('Product is already denoised.')
 
-    def normalize(self, output_range=[0, 1]):
+    def normalize(self, output_range=[0, 1], extend=True):
         """ Scale data to output_range.
         """
         """ Normalize """
-        self.data -= self.data.min()
-        self.data /= self.data.max()
+        if extend:
+            self.data -= self.data.min()
+            self.data /= self.data.max()
+        else:
+            self.data -= self.img_min
+            self.data /= self.img_max - self.img_min
         """ Scale to output_range """
         self.data = self.data * (output_range[1] - output_range[0]) + output_range[0]
 
-    def clip_normalize(self, output_range=[0, 1]):
+    def clip_normalize(self, output_range=[0, 1], extend=True):
         """ Clip data and normalize it
         """
         self.clip()
-        self.normalize(output_range=output_range)
+        self.normalize(output_range=output_range, extend=extend)
 
     def clip(self):
         self.data[self.data > self.img_max] = self.img_max
