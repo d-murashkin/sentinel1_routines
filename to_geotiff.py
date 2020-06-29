@@ -20,7 +20,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True):
     if speckle_filter:
         try:
             import cv2
-            img = cv2.bilateralFilter(img, 25, 15, 15)
+            img = cv2.bilateralFilter(img, 5, 15, 15)
         except:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
     img *= 255
@@ -33,16 +33,19 @@ def rgb(input_path, output_path, speckle_filter=True):
     """
     p = Sentinel1Product(input_path)
     p.read_data(parallel=True, keep_useless_data=False, crop_borders=False)
-    p.HH.clip_normalize()
-    p.HV.clip_normalize()
+    p.HH.clip_normalize(extend=False)
+    p.HV.clip_normalize(extend=False)
     ratio = p.HV.data - p.HH.data
-    ratio -= ratio.min()
-    ratio /= ratio.max()
+    ratio *= 0.5
+    ratio += 0.5
+    ratio[ratio < 0] = 0
+    ratio[ratio > 1] = 1
+    
     img = np.stack([p.HH.data, p.HV.data, ratio], axis=2)
     if speckle_filter:
         try:
             import cv2
-            img = cv2.bilateralFilter(img, 25, 15, 15)
+            img = cv2.bilateralFilter(img, 5, 15, 15)
         except:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
     img *= 255
