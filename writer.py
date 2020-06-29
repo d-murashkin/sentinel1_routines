@@ -37,8 +37,11 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
         return False
 
     driver = gdal.GetDriverByName('GTiff')
-    out_x = X // dec + 1 if np.remainder(X, dec) else X // dec
-    out_y = Y // dec + 1 if np.remainder(Y, dec) else Y // dec
+#    out_x = X // dec + 1 if np.remainder(X, dec) else X // dec
+#    out_y = Y // dec + 1 if np.remainder(Y, dec) else Y // dec
+    out_x = X // dec
+    out_y = Y // dec
+#    out_y, out_x = input_data.shape[:2]
     out = driver.Create(output_path, out_x, out_y, bands, datatype, options=['COMPRESS=DEFLATE'])
     for gcp in gcps:
         gcp.GCPLine /= dec
@@ -55,7 +58,9 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
         
         if 'nodata_mask' in gdal_data:
             print('apply nodata mask from the original scene')
-            data_to_write[gdal_data['nodata_mask'][::dec, ::dec]] = nodata_val
+            mask = gdal_data['nodata_mask'][:out_y * dec:dec, :out_x * dec:dec]
+            print(mask.shape)
+            data_to_write[mask] = nodata_val
 
         band.WriteArray(data_to_write)
     
