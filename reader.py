@@ -206,7 +206,7 @@ class Sentinel1Band(object):
         self.data += self.img_min
 
     def incidence_angle_correction(self, elevation_angle):
-        self.data = self.data + 0.049 * (elevation_angle - elevation_angle.min())
+        self.data = self.data + 0.213 * (elevation_angle - elevation_angle.min())
 
     def remove_useless_data(self):
         self.calibration = None
