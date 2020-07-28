@@ -31,7 +31,11 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True):
 def rgb(input_path, output_path, speckle_filter=True):
     """ Create an RBG image from calibrated HH, HV and HV/HH bands of the specified Sentinel-1 product.
     """
-    p = Sentinel1Product(input_path)
+    try:
+        p = Sentinel1Product(input_path)
+    except:
+        print('Error reading {0}'.format(input_path))
+        return False
     p.read_data(parallel=True, keep_useless_data=False, crop_borders=False)
     p.HH.clip_normalize(extend=False)
     p.HV.clip_normalize(extend=False)
