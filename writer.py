@@ -50,16 +50,14 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
 
     for n, layer in enumerate(np.split(data, bands, axis=2)):
         band = out.GetRasterBand(n + 1)
-        if 'x_min' in gdal_data:
+        if ('x_min' in gdal_data) and (np.squeeze(layer).shape != (out_y, out_x)):
             data_to_write = np.full((out_y, out_x), nodata_val, dtype=input_data.dtype)
             data_to_write[:, gdal_data['x_min'] // dec:gdal_data['x_min'] // dec + layer.shape[1]] = np.squeeze(layer)
         else:
             data_to_write = np.squeeze(layer)
         
         if 'nodata_mask' in gdal_data:
-            print('apply nodata mask from the original scene')
             mask = gdal_data['nodata_mask'][:out_y * dec:dec, :out_x * dec:dec]
-            print(mask.shape)
             data_to_write[mask] = nodata_val
 
         band.WriteArray(data_to_write)
