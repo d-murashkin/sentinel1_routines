@@ -372,7 +372,10 @@ class Sentinel1Product(object):
         gcp_data_spline = RectBivariateSpline(xs, ys, gcp_data.reshape(ran, gcps_per_line), kx=1, ky=1)
         x_new = np.arange(0, self.HH.X, 1, dtype=np.int16)
         y_new = np.arange(0, self.HH.Y, 1, dtype=np.int16)
-        setattr(self, parameter, gcp_data_spline(x_new, y_new).astype(np.float32))
+        result = gcp_data_spline(x_new, y_new).astype(np.float32)
+        if 'x_min' in self.gdal_data:
+            result = result[:, self.gdal_data['x_min']:self.gdal_data['x_max']]
+        setattr(self, parameter, result)
         return True
     
     def interpolate_latitude(self, gcps_per_line=21):
