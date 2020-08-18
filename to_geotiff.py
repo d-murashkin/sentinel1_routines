@@ -57,12 +57,16 @@ def rgb(input_path, output_path, speckle_filter=True):
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def calibrated(input_path, output_path, speckle_filter=True):
+def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False):
     """ Create a geotiff with calibrated data (in dB).
     """
     p = Sentinel1Product(input_path)
     p.read_data(parallel=True, keep_useless_data=True, crop_borders=False)
-    data = np.stack([p.HH.data, p.HV.data], axis=2) * 10 / np.log(10)
+    bands = [p.HH.data, p.HV.data]
+    if save_incidence_angle:
+        p.interpolate_incidence_angle()
+        bands.append(p.incidence_angle)
+    data = np.stack(bands, axis=2)
     write_data_geotiff(data, output_path, p.gdal_data)
 
 
