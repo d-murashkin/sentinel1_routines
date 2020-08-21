@@ -22,6 +22,9 @@ from scipy.interpolate import RectBivariateSpline
 from scipy.interpolate import griddata
 from scipy.interpolate import interp1d
 from PIL import Image
+
+from sentinel1_routines.utils import scene_time
+
 Image.MAX_IMAGE_PIXELS = None   # turn off the warning about large image size
 
 
@@ -278,10 +281,11 @@ class Sentinel1Product(object):
             setattr(self, band_name, Sentinel1Band(d, a, c, n, band_name))
 
         """ Create datetime object """
-        try:
-            self.timestamp = datetime.strptime(self.data_files[0].split('-')[4], "%Y%m%dt%H%M%S")
-        except:
-            self.timestamp = False
+        self.timestamp = scene_time(self.data_files[0])
+#        try:
+#            self.timestamp = datetime.strptime(self.data_files[0].split('-')[4], "%Y%m%dt%H%M%S")
+#        except:
+#            self.timestamp = False
         
         try:
             import gdal
