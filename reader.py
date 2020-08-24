@@ -281,11 +281,7 @@ class Sentinel1Product(object):
             setattr(self, band_name, Sentinel1Band(d, a, c, n, band_name))
 
         """ Create datetime object """
-        self.timestamp = scene_time(self.data_files[0])
-#        try:
-#            self.timestamp = datetime.strptime(self.data_files[0].split('-')[4], "%Y%m%dt%H%M%S")
-#        except:
-#            self.timestamp = False
+        self.timestamp = scene_time(product_path)
         
         try:
             import gdal
@@ -485,6 +481,10 @@ class Sentinel1Product(object):
             for item in ['data', 'noise', 'calibration']:
                 if hasattr(band, item):
                     setattr(band, item, getattr(band, item)[:, self.x_min:self.x_max])
+    
+    def orbit_direction(self):
+        annotation_file = ElementTree.parse(self.annotation_files[0]).getroot()
+        return annotation_file[2][0][0].text.lower()
     
 
 def _read_single_band(band):
