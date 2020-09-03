@@ -6,11 +6,11 @@ from sentinel1_routines.reader import Sentinel1Product
 from sentinel1_routines.writer import write_data_geotiff
 
 
-def grayscale(input_path, output_path, band='hh', speckle_filter=True):
+def grayscale(input_path, output_path, band='hh', speckle_filter=True, incidence_angle_correction=True):
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
     p = Sentinel1Product(input_path)
-    p.read_data(parallel=True, keep_useless_data=False, crop_borders=False)
+    p.read_data(parallel=True, keep_useless_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction)
     if band.lower() == 'hh':
         p.HH.clip_normalize()
         img = p.HH.data
@@ -28,7 +28,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True):
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def rgb(input_path, output_path, speckle_filter=True):
+def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction=True):
     """ Create an RBG image from calibrated HH, HV and HV/HH bands of the specified Sentinel-1 product.
     """
     try:
@@ -36,7 +36,7 @@ def rgb(input_path, output_path, speckle_filter=True):
     except:
         print('Error reading {0}'.format(input_path))
         return False
-    p.read_data(parallel=True, keep_useless_data=False, crop_borders=False)
+    p.read_data(parallel=True, keep_useless_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction)
     p.HH.clip_normalize(extend=False)
     p.HV.clip_normalize(extend=False)
     ratio = p.HV.data - p.HH.data
@@ -57,11 +57,11 @@ def rgb(input_path, output_path, speckle_filter=True):
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False):
+def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False, incidence_angle_correction=True):
     """ Create a geotiff with calibrated data (in dB).
     """
     p = Sentinel1Product(input_path)
-    p.read_data(parallel=True, keep_useless_data=True, crop_borders=False)
+    p.read_data(parallel=True, keep_useless_data=True, crop_borders=False, incidence_angle_correction=incidence_angle_correction)
     bands = [p.HH.data, p.HV.data]
     if save_incidence_angle:
         p.interpolate_incidence_angle()
