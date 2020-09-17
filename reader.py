@@ -16,6 +16,7 @@ from xml.etree import ElementTree
 from datetime import datetime
 from multiprocessing.pool import ThreadPool
 from io import BytesIO
+from functools import partial
 
 import numpy as np
 from scipy.interpolate import RectBivariateSpline
@@ -423,7 +424,7 @@ class Sentinel1Product(object):
         self.HV.shifted = True if self.shifted else False
         return True
 
-    def read_data(self, band='both', incidence_angle_correction=True, keep_useless_data=True, parallel=False, crop_borders=True):
+    def read_data(self, band='both', incidence_angle_correction=True, keep_calibration_data=True, parallel=False, crop_borders=True):
         """ Shortcut for reading data, noise, calibration, and noise subtraction)
         """
         if band.lower() == 'both':
@@ -433,11 +434,12 @@ class Sentinel1Product(object):
         elif band.lower() == 'hv':
             band_list = [self.HV]
         
+        _rsb = partial(_read_single_band, keep_calibration_data=keep_calibration_data)
         if not parallel:
-            list(map(_read_single_band, band_list))
+            list(map(_rsb, band_list))
         else:
             pool = ThreadPool(2)
-            pool.map(_read_single_band, band_list)
+            pool.map(_rsb, band_list)
             pool.close()
             pool.join()
         
@@ -448,7 +450,7 @@ class Sentinel1Product(object):
             self.HH.incidence_angle_correction(self.elevation_angle)
 
         """ Replace infinits (that appears after noise subtraction and calibration) with nofinite_data_val. """
-        nofinite_data_val = -4.6
+        nofinite_data_val = -32
         for band in band_list:
             band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
             band.data[band.nofinite_data_mask] = nofinite_data_val
@@ -487,11 +489,16 @@ class Sentinel1Product(object):
         return annotation_file[2][0][0].text.lower()
     
 
-def _read_single_band(band):
+def _read_single_band(band, keep_calibration_data=True):
     band.read_data()
     band.read_noise()
     band.read_calibration()
     band.subtract_noise()
+    if not keep_calibration_data:
+        band.noise = False
+        band.calibration = False
+        if hasattr(band, 'azimuth_noise'):
+            band.azimuth_noise = False
     return True
 
 
