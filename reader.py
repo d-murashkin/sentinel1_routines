@@ -482,6 +482,9 @@ class Sentinel1Product(object):
         for band in [self.HH, self.HV]:
             for item in ['data', 'noise', 'calibration']:
                 if hasattr(band, item):
+                    attr = getattr(band, item)
+                    if type(attr) != np.ndarray:
+                        continue
                     setattr(band, item, getattr(band, item)[:, self.x_min:self.x_max])
     
     def orbit_direction(self):
