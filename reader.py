@@ -52,6 +52,7 @@ class Sentinel1Band(object):
         self.des = band_name.lower()
         self.img_max = 4 if self.des == 'hh' else -15
         self.img_min = -29 if self.des == 'hh' else -32
+        self.incidence_angle_correction_coefficient = 0.213 if self.des == 'hh' else 0.053
         self.data_path = data_path
         self.noise_path = noist_path
         self.calibration_path = calibration_path
@@ -210,7 +211,7 @@ class Sentinel1Band(object):
         self.data += self.img_min
 
     def incidence_angle_correction(self, elevation_angle):
-        self.data = self.data + 0.213 * (elevation_angle - elevation_angle.min())
+        self.data = self.data + self.incidence_angle_correction_coefficient * (elevation_angle - elevation_angle.min())
 
     def remove_useless_data(self):
         self.calibration = None
@@ -424,7 +425,7 @@ class Sentinel1Product(object):
         self.HV.shifted = True if self.shifted else False
         return True
 
-    def read_data(self, band='both', incidence_angle_correction=True, keep_calibration_data=True, parallel=False, crop_borders=True):
+    def read_data(self, band='both', incidence_angle_correction=True, keep_calibration_data=True, parallel=False, crop_borders=True, correct_hv=False):
         """ Shortcut for reading data, noise, calibration, and noise subtraction)
         """
         if band.lower() == 'both':
@@ -443,11 +444,14 @@ class Sentinel1Product(object):
             pool.close()
             pool.join()
         
-        """ Incidence angle correction for the HH band. """
-        if incidence_angle_correction and hasattr(self, 'HH'):
+        """ Incidence angle correction. """
+        if incidence_angle_correction:
             self.read_GCPs()
             self.interpolate_elevation_angle()
-            self.HH.incidence_angle_correction(self.elevation_angle)
+            if hasattr(self, 'HH'):
+                self.HH.incidence_angle_correction(self.elevation_angle)
+            if hasattr(self, 'HV') and (correct_hv):
+                self.HV.incidence_angle_correction(self.elevation_angle)
 
         """ Replace infinits (that appears after noise subtraction and calibration) with nofinite_data_val. """
         nofinite_data_val = -32
