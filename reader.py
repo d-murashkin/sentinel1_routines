@@ -48,13 +48,13 @@ class Sentinel1Band(object):
             subtract_noise()
             incidence_angle_correction(elevation_angle)
     """
-    def __init__(self, data_path, annotation_path, calibration_path, noist_path, band_name):
+    def __init__(self, data_path, annotation_path, calibration_path, noise_path, band_name):
         self.des = band_name.lower()
         self.img_max = 4 if self.des == 'hh' else -15
         self.img_min = -29 if self.des == 'hh' else -32
         self.incidence_angle_correction_coefficient = 0.213 if self.des == 'hh' else 0.053
         self.data_path = data_path
-        self.noise_path = noist_path
+        self.noise_path = noise_path
         self.calibration_path = calibration_path
         self.annotation_path = annotation_path
         self.denoised = False
@@ -112,7 +112,7 @@ class Sentinel1Band(object):
                 self._read_azimuth_noise(noise_file)
                 self.noise *= self.azimuth_noise
             except:
-                print('Failed to read azimuth noise (this is normal for Sentinel-1 scenes taken before 13 March 2018).')
+                print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
     
     def _read_azimuth_noise(self, noise_file):
         """ Read scalloping noise data.
