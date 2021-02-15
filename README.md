@@ -1,9 +1,23 @@
+## Use the shell script to convert Sentinel-1 EW scenes to GeoTiff image
 Convert a Sentinel-1 EW scene in a calibrated GeoTiff:
 ```console
 python apply_clibration.py -i <input> -o <output>
 ```
 
-or use routines in python:
+## Requirements
+The following python packages are needed:
+* numpy
+* scipy
+* gdal
+* pillow
+
+Use conda to install the required libraries:
+```sh
+conda install numpy scipy gdal pillow
+```
+
+
+## How to use routines in python:
   * read a Sentinel-1 EW scene (zipped or unzipped):
     ```python
     from sentinel1_routines.reader import Sentinel1Product
