@@ -35,14 +35,14 @@ if __name__ == "__main__":
     print('Processing...')
     t = time.time()
     if tp == 'rgb':
-        rgb(args.i, output, speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel)
+        rgb(args.i, output, speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel, correct_hv=False)
     elif tp == 'grayscale':
         if not args.b:
             print('Specify band with -b option: hh or hv')
             sys.exit()
-        grayscale(args.i, output, band=args.b.lower(), speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel)
+        grayscale(args.i, output, band=args.b.lower(), speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel, correct_hv=False)
     elif tp == 'db':
-        calibrated(args.i, output, speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel)
+        calibrated(args.i, output, speckle_filter=filt, incidence_angle_correction=inc_angle_corr, parallel=parallel, correct_hv=False)
     else:
         print('Unrecognised type "{0}". Possible options are "RGB", "grayscale", "dB".'.format(tp))
     print('... is done in {0} seconds.'.format(int(time.time() - t)))

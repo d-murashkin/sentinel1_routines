@@ -10,7 +10,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, incidence
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
     p = Sentinel1Product(input_path)
-    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=True)
+    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=False)
     if band.lower() == 'hh':
         p.HH.clip_normalize()
         img = p.HH.data
@@ -36,7 +36,7 @@ def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction
     except:
         print('Error reading {0}'.format(input_path))
         return False
-    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=True)
+    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=False)
     p.HH.clip_normalize(extend=False)
     p.HV.clip_normalize(extend=False)
     ratio = p.HV.data - p.HH.data
@@ -58,7 +58,7 @@ def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False, incidence_angle_correction=True, parallel=True, correct_hv=True):
+def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False, incidence_angle_correction=True, parallel=True, correct_hv=False):
     """ Create a geotiff with calibrated data (in dB).
     """
     p = Sentinel1Product(input_path)
