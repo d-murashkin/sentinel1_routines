@@ -1,5 +1,7 @@
-""" Some small utils for Sentinel-1 scenes.
+""" Utils for Sentinel-1 scenes.
 """
+
+__author__ = 'Dmitrii Murashkin'
 import datetime
 import os
 
@@ -13,7 +15,10 @@ def scene_time(scene_path):
     """
     scene_name = os.path.basename(scene_path)
     try:
-        timestamp = scene_name.split('_')[4]
+        date_string = scene_name.split('_')[4]
+        date_format = '%Y%m%dT%H%M%S'
+        date = datetime.datetime.strptime(date_string, date_format)
     except IndexError:
+        print('Date {0} does not correspond to {1} format.'.format(date_string, date_format))
         return False
-    return(datetime.datetime.strptime(timestamp, '%Y%m%dt%H%M%S'))
+    return date

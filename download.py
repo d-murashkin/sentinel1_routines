@@ -1,9 +1,10 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
 """
 Script for searching and downloading data from sentinel satellites.
 dhusget.sh script from the Copernicus web-page is used.
+Single scenes can be downloaded from https://datapool.asf.alaska.edu
 """
+
+__author__ = 'Dmitrii Murashkin'
 
 import os
 import subprocess
@@ -14,6 +15,8 @@ import stat
 import pandas as pd
 from pandas import read_csv
 
+from scene_management import get_scene_folder
+
 
 def set_dir(dir_path):
     """ Set folder. Create it if it does not exist. """
@@ -22,31 +25,12 @@ def set_dir(dir_path):
     return dir_path
 
 
-def create_day_folder(fld, date):
-    """ Create the following folder structure in fld:
-        fld/year/month/day/
-        Return path to the date folder.
-    """
-    d_fld = fld + '{0}/{1}/{2}/'.format(date.year, date.strftime('%m'), date.strftime('%d'))
-    if os.path.exists(d_fld):
-        """ Folder already exists. """
-        return d_fld
-    try:
-        y_fld = set_dir(fld + '{0}/'.format(date.year))
-        m_fld = set_dir(y_fld + '{0}/'.format(date.strftime('%m')))
-        d_fld = set_dir(m_fld + '{0}/'.format(date.strftime('%d')))
-    except:
-        print 'Could not create folders in {0}.'.format(fld)
-        return False
-    return d_fld
-
-
 def create_list_of_products(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_date, end_date, login, password, lock_folder='', return_path=False):
     """ Return list of products that fit the specified rectangle and sensing date.
     """
     """ Ensure that time variables are of the datetime.date type. """
     if not ((type(start_date) == datetime.date) or (type(start_date) == datetime.datetime)) and ((type(end_date) == datetime.date) or (type(end_date) == datetime.date)):
-        print 'start_date and end_date are expected to be of the datetime.date type.'
+        print('start_date and end_date are expected to be of the datetime.date type.')
         return False
 
     list_of_products = []
@@ -70,15 +54,15 @@ def create_list_of_products(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_da
 def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_date, end_date, login, password, lock_folder='', n=2):
     """ Ensure that time variables are of the datetime.date type. """
     if not ((type(start_date) == datetime.date) or (type(start_date) == datetime.datetime)) and ((type(end_date) == datetime.date) or (type(end_date) == datetime.date)):
-        print 'start_date and end_date are expected to be of the datetime.date or the datetime.datetime type.'
+        print('start_date and end_date are expected to be of the datetime.date or the datetime.datetime type.')
         return False
     
     if not lock_folder:
         lock_folder = './dhusget_lock/'
-    print 'lock folder:', lock_folder
+    print('lock folder: {0}'.format(lock_folder))
     
-    dhusget = fld + 'dhusget.sh'
-    shutil.copyfile(os.path.dirname(os.path.realpath(__file__)) + '/dhusget.sh', dhusget)
+    dhusget = os.path.join(fld, 'dhusget.sh')
+    shutil.copyfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dhusget.sh'), dhusget)
     st = os.stat(dhusget)
     try:
         os.chmod(dhusget, st.st_mode | stat.S_IEXEC)
@@ -87,9 +71,9 @@ def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_dat
         pass
     current_fld = os.getcwd()
     os.chdir(fld)
-    if os.path.exists(fld + '/PRODUCT/'):
-        for item in os.listdir(fld + '/PRODUCT/'):
-            pth = fld + '/PRODUCT/' + item
+    if os.path.exists(os.path.join(fld, 'PRODUCT')):
+        for item in os.listdir(os.path.join(fld, 'PRODUCT')):
+            pth = os.path.join(fld, 'PRODUCT', item)
             if os.stat(pth).st_size == 0:
                 os.remove(pth)
     page = 1
@@ -103,35 +87,30 @@ def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_dat
             break
         page += 1
     os.chdir(current_fld)
-    print "Download complete."
+    print("Download complete.")
     return True
 
 
-def arrange_s1_file(inp_fld, out_fld, item):
-    """ This function moves file *item* from input folder into year/month/day structure
-        of the output folder.
-        Output folder should be the root folder of the file structure.
-    """
-    name = item.split('_')
-    if name[0][:2] != 'S1':
-        """ Not a Sentinel-1 product file. """
+def download_single_scene(scene_name):
+    scene_name = scene_name.split('.')[0]
+    try:
+        root_folder = os.environ['S1PATH']
+    except:
+        root_folder = ''
+    try:
+        asf_credentials = os.environ['ASF_CREDENTIALS']
+        with open(asf_credentials) as f:
+            username = f.readline()[:-1]
+            passwd = f.readline()[:-1]
+    except:
+        print('No credentials provided.')
         return False
-    elif name[1] != 'EW':
-        """ Not a product taken in Extra Wide swath mode. """
-        return False
-    elif name[2][:3] != 'GRD':
-        """ Not a GRD product. """
-        return False
-    elif name[3] != '1SDH':
-        """ Not a dual-band data product. """
-        return False
-
-    date = datetime.datetime.strptime(name[4], '%Y%m%dT%H%M%S')
-    day_fld = create_day_folder(out_fld, date)
-    path = set_dir(day_fld + 'PRODUCT/')
-    if os.path.exists(path + item):
-        return True
-    shutil.move(inp_fld + item, path)
+    
+    cwd = os.getcwd()
+    download_path = get_scene_folder(scene_name, root_folder)
+    os.chdir(download_path)
+    subprocess.call('wget -c --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    os.chdir(cwd)
     return True
 
 

@@ -6,11 +6,11 @@ from sentinel1_routines.reader import Sentinel1Product
 from sentinel1_routines.writer import write_data_geotiff
 
 
-def grayscale(input_path, output_path, band='hh', speckle_filter=True, incidence_angle_correction=True, parallel=True):
+def grayscale(input_path, output_path, band='hh', speckle_filter=True, **kwargs):
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
     p = Sentinel1Product(input_path)
-    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=False)
+    p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
     if band.lower() == 'hh':
         p.HH.clip_normalize()
         img = p.HH.data
@@ -28,7 +28,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, incidence
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction=True, parallel=True):
+def rgb(input_path, output_path, speckle_filter=True, **kwargs):
     """ Create an RBG image from calibrated HH, HV and HV/HH bands of the specified Sentinel-1 product.
     """
     try:
@@ -36,7 +36,7 @@ def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction
     except:
         print('Error reading {0}'.format(input_path))
         return False
-    p.read_data(parallel=parallel, keep_calibration_data=False, crop_borders=False, incidence_angle_correction=incidence_angle_correction, correct_hv=False)
+    p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
     p.HH.clip_normalize(extend=False)
     p.HV.clip_normalize(extend=False)
     ratio = p.HV.data - p.HH.data
@@ -58,11 +58,11 @@ def rgb(input_path, output_path, speckle_filter=True, incidence_angle_correction
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def calibrated(input_path, output_path, speckle_filter=True, save_incidence_angle=False, incidence_angle_correction=True, parallel=True, correct_hv=False):
+def calibrated(input_path, output_path, save_incidence_angle=False, **kwargs):
     """ Create a geotiff with calibrated data (in dB).
     """
     p = Sentinel1Product(input_path)
-    p.read_data(parallel=parallel, keep_calibration_data=True, crop_borders=False, incidence_angle_correction=incidence_angle_correction)
+    p.read_data(keep_calibration_data=True, crop_borders=False, **kwargs)
     bands = [p.HH.data, p.HV.data]
     if save_incidence_angle:
         p.interpolate_incidence_angle()
