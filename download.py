@@ -36,7 +36,7 @@ def create_list_of_products(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_da
     list_of_products = []
     page = 1
     while True:
-        subprocess.call('./dhusget.sh -u {7} -p {8} -L {9} -m Sentinel-1 -c {0},{1}:{2},{3} -T GRD -F "*_GRDM_*" -S {5}T00:00:00.000Z -E {6}T00:00:00.000Z -l 100 -P {4}'.format(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, page, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), login, password, lock_folder), shell=True)
+        subprocess.call(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dhusget.sh') + ' -u {7} -p {8} -L {9} -m Sentinel-1 -c {0},{1}:{2},{3} -T GRD -F "*_GRDM_*" -S {5}T00:00:00.000Z -E {6}T00:00:00.000Z -l 100 -P {4}'.format(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, page, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), login, password, lock_folder), shell=True)
         try:
             df = read_csv('products-list.csv', header=None, names=['name', 'address'])
         except:
@@ -109,7 +109,7 @@ def download_single_scene(scene_name):
     cwd = os.getcwd()
     download_path = get_scene_folder(scene_name, root_folder)
     os.chdir(download_path)
-    subprocess.call('wget -c --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
     os.chdir(cwd)
     return True
 

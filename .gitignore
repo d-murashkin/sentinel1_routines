@@ -1,2 +1,6 @@
 *.pyc
 __pycache__
+logs/
+OSquery-result.xml
+product_list
+products-list.csv
