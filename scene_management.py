@@ -8,7 +8,7 @@ import os
 import re
 import shutil
 
-from utils import scene_time
+from .utils import scene_time
 
 
 def get_scene_folder(scene_name, root_folder, ensure_existence=True, PRODUCT=True):
@@ -18,6 +18,27 @@ def get_scene_folder(scene_name, root_folder, ensure_existence=True, PRODUCT=Tru
     scene_name = scene_name.split('.')[0]
     date = scene_time(scene_name)
     
+    '''
+    year = date.strftime('%Y')
+    month = date.strftime('%m')
+    day = date.strftime('%d')
+    scene_folder = os.path.join(root_folder, year, month, day)
+    if PRODUCT:
+        scene_folder = os.path.join(root_folder, year, month, day, 'PRODUCT')
+
+    if ensure_existence:
+        try:
+            if not os.path.exists(scene_folder):        # for python2 compatibility
+                os.makedirs(scene_folder)               #
+#            os.makedirs(scene_folder, exist_ok=True)
+        except:
+            print('Could not create folders in {0}.'.format(root_folder))
+            return False
+    '''
+    return get_date_folder(date, root_folder, ensure_existence, PRODUCT)
+
+
+def get_date_folder(date, root_folder, ensure_existence=True, PRODUCT=True):
     year = date.strftime('%Y')
     month = date.strftime('%m')
     day = date.strftime('%d')

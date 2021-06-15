@@ -24,7 +24,7 @@ from scipy.interpolate import griddata
 from scipy.interpolate import interp1d
 from PIL import Image
 
-from sentinel1_routines.utils import scene_time
+from .utils import scene_time
 
 Image.MAX_IMAGE_PIXELS = None   # turn off the warning about large image size
 

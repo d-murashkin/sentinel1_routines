@@ -2,8 +2,8 @@
 """
 import numpy as np
 
-from sentinel1_routines.reader import Sentinel1Product
-from sentinel1_routines.writer import write_data_geotiff
+from .reader import Sentinel1Product
+from .writer import write_data_geotiff
 
 
 def grayscale(input_path, output_path, band='hh', speckle_filter=True, **kwargs):
