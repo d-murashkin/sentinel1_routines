@@ -11,7 +11,7 @@ import shutil
 from .utils import scene_time
 
 
-def get_scene_folder(scene_name, root_folder, ensure_existence=True, PRODUCT=True):
+def get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folder=''):
     """ Find path to the scene in the *root_folder* storage
         and optionally ensure its existence (create folders if needed).
     """
@@ -35,16 +35,16 @@ def get_scene_folder(scene_name, root_folder, ensure_existence=True, PRODUCT=Tru
             print('Could not create folders in {0}.'.format(root_folder))
             return False
     '''
-    return get_date_folder(date, root_folder, ensure_existence, PRODUCT)
+    return get_date_folder(date, root_folder, ensure_existence, extra_folder)
 
 
-def get_date_folder(date, root_folder, ensure_existence=True, PRODUCT=True):
+def get_date_folder(date, root_folder, ensure_existence=True, extra_folder=''):
     year = date.strftime('%Y')
     month = date.strftime('%m')
     day = date.strftime('%d')
-    scene_folder = os.path.join(root_folder, year, month, day)
-    if PRODUCT:
-        scene_folder = os.path.join(root_folder, year, month, day, 'PRODUCT')
+    scene_folder = os.path.join(root_folder, year, month, day, extra_folder)
+#    if PRODUCT:
+#        scene_folder = os.path.join(root_folder, year, month, day, 'PRODUCT')
 
     if ensure_existence:
         try:

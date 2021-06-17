@@ -5,6 +5,7 @@ Single scenes can be downloaded from https://datapool.asf.alaska.edu
 """
 
 __author__ = 'Dmitrii Murashkin'
+__email__ = 'murashkin@uni-bremen.de'
 
 import os
 import subprocess
@@ -52,7 +53,8 @@ def create_list_of_products(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_da
 
 
 def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_date, end_date, login, password, lock_folder='', n=2):
-    """ Ensure that time variables are of the datetime.date type. """
+    """ Deprecated.
+        Ensure that time variables are of the datetime.date type. """
     if not ((type(start_date) == datetime.date) or (type(start_date) == datetime.datetime)) and ((type(end_date) == datetime.date) or (type(end_date) == datetime.date)):
         print('start_date and end_date are expected to be of the datetime.date or the datetime.datetime type.')
         return False
@@ -130,7 +132,7 @@ def download_single_scene(scene_name, root_folder=False, output_folder='./'):
     return True
 
 
-def download_single_day(date, root_folder=False, output_folder='./'):
+def download_single_day(date, root_folder=False, output_folder='./', extra_folder=''):
     if not (type(date) is datetime.datetime) or (type(date) is datetime.date):
         print('input should be a datetime.datetime or datetime.date instance.')
         return False
@@ -144,7 +146,7 @@ def download_single_day(date, root_folder=False, output_folder='./'):
             except:
                 print('Could not read $S1PATH environment variable.')
                 return False
-        download_path = get_date_folder(date, root_folder)
+        download_path = get_date_folder(date, root_folder, extra_folder=extra_folder)
             
     try:
         asf_credentials = os.environ['ASF_CREDENTIALS']
@@ -163,10 +165,10 @@ def download_single_day(date, root_folder=False, output_folder='./'):
     search_string += '&processingLevel=GRD_MD'
     search_string += '&start={0}'.format(date.strftime('%Y-%m-%dT00:00:00UTC'))
     search_string += '&end={0}'.format(date.strftime('%Y-%m-%dT23:59:59UTC'))
-    search_string += '&intersetsWith=polygon%28%28-160.6349+60.8024%2C-156.8663+69.0027%2C-128.1877+67.8319%2C-24.5383+80.8176%2C-36.4015+66.743%2C-19.1937+64.2656%2C36.6742+67.6532%2C64.5098+66.8212%2C121.018+70.5129%2C148.6526+69.0332%2C-160.6349+60.8024%29%29'
     search_string += '&output=metalink'
-#    search_string = 'https://api.daac.asf.alaska.edu/services/search/param?platform=S1&beamSwath=EW&processingLevel=GRD_MD&start=2021-05-01T00:00:00UTC&end=2021-05-01T23:59:59UTC&output=csv&intersectsWith=polygon%28%28-160.6349+60.8024%2C-156.8663+69.0027%2C-128.1877+67.8319%2C-24.5383+80.8176%2C-36.4015+66.743%2C-19.1937+64.2656%2C36.6742+67.6532%2C64.5098+66.8212%2C121.018+70.5129%2C148.6526+69.0332%2C-160.6349+60.8024%29%29'
-    subprocess.call('aria2c --http-auth-challenge=true --http-user={0} --http-passwd={1} {2}'.format(username, passwd, search_string), shell=True)
+    search_string += '&intersectsWith=polygon((-160.6349 60.8024,-156.8663 69.0027,-128.1877 67.8319,-24.5383 80.8176,-36.4015 66.743,-19.1937 64.2656,36.6742 67.6532,64.5098 66.8212,121.018 70.5129,148.6526 69.0332,-160.6349 60.8024))'.replace('(', '%28').replace(')', '%29').replace(',', '%2C').replace(' ', '+')
+    subprocess.call('aria2c --http-auth-challenge=true --http-user={0} --http-passwd={1} --continue=true --check-integrity=true "{2}"'.format(username, passwd, search_string), shell=True)
+
     os.chdir(cwd)
     return True
 
