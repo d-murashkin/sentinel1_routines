@@ -167,7 +167,8 @@ def download_single_day(date, root_folder=False, output_folder='./', extra_folde
     search_string += '&end={0}'.format(date.strftime('%Y-%m-%dT23:59:59UTC'))
     search_string += '&output=metalink'
     search_string += '&intersectsWith=polygon((-160.6349 60.8024,-156.8663 69.0027,-128.1877 67.8319,-24.5383 80.8176,-36.4015 66.743,-19.1937 64.2656,36.6742 67.6532,64.5098 66.8212,121.018 70.5129,148.6526 69.0332,-160.6349 60.8024))'.replace('(', '%28').replace(')', '%29').replace(',', '%2C').replace(' ', '+')
-    subprocess.call('aria2c --http-auth-challenge=true --http-user={0} --http-passwd={1} --continue=true --check-integrity=true "{2}"'.format(username, passwd, search_string), shell=True)
+#    subprocess.call('aria2c --http-auth-challenge=true --http-user={0} --http-passwd={1} --continue=true --check-integrity=true --max-tries=0 --max-concurrent-downloads=3 "{2}"'.format(username, passwd, search_string), shell=True)
+    subprocess.call('aria2c --http-auth-challenge=true --http-user={0} --http-passwd={1} --check-integrity=true --max-tries=0 --max-concurrent-downloads=3 "{2}"'.format(username, passwd, search_string), shell=True)
 
     os.chdir(cwd)
     return True
