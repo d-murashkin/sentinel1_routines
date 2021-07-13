@@ -18,23 +18,6 @@ def get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folde
     scene_name = scene_name.split('.')[0]
     date = scene_time(scene_name)
     
-    '''
-    year = date.strftime('%Y')
-    month = date.strftime('%m')
-    day = date.strftime('%d')
-    scene_folder = os.path.join(root_folder, year, month, day)
-    if PRODUCT:
-        scene_folder = os.path.join(root_folder, year, month, day, 'PRODUCT')
-
-    if ensure_existence:
-        try:
-            if not os.path.exists(scene_folder):        # for python2 compatibility
-                os.makedirs(scene_folder)               #
-#            os.makedirs(scene_folder, exist_ok=True)
-        except:
-            print('Could not create folders in {0}.'.format(root_folder))
-            return False
-    '''
     return get_date_folder(date, root_folder, ensure_existence, extra_folder)
 
 
@@ -43,8 +26,6 @@ def get_date_folder(date, root_folder, ensure_existence=True, extra_folder=''):
     month = date.strftime('%m')
     day = date.strftime('%d')
     scene_folder = os.path.join(root_folder, year, month, day, extra_folder)
-#    if PRODUCT:
-#        scene_folder = os.path.join(root_folder, year, month, day, 'PRODUCT')
 
     if ensure_existence:
         try:
@@ -58,7 +39,7 @@ def get_date_folder(date, root_folder, ensure_existence=True, extra_folder=''):
     return scene_folder
 
 
-def arrange_scene(scene_path, root_folder, copy=False):
+def arrange_scene(scene_path, root_folder, copy=False, extra_folder=''):
     scene_name = os.path.basename(scene_path)
     if not re.search('^S1(A|B)', scene_name.split('_')[0]):
         """ This is not a Sentinel-1 product file. """
@@ -67,7 +48,7 @@ def arrange_scene(scene_path, root_folder, copy=False):
         """ This is not a zip archive, skip it. """
         return False
     
-    scene_folder = get_scene_folder(scene_name, root_folder, ensure_existence=True)
+    scene_folder = get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folder=extra_folder)
     try:
         if copy:
             shutil.copy(scene_path, scene_folder)
