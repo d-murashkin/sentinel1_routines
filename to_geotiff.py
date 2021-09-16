@@ -6,10 +6,10 @@ from .reader import Sentinel1Product
 from .writer import write_data_geotiff
 
 
-def grayscale(input_path, output_path, band='hh', speckle_filter=True, **kwargs):
+def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noise=False, **kwargs):
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
-    p = Sentinel1Product(input_path)
+    p = Sentinel1Product(input_path, scale_noise=scale_noise)
     p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
     if band.lower() == 'hh':
         p.HH.clip_normalize()

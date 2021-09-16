@@ -48,7 +48,7 @@ class Sentinel1Band(object):
             subtract_noise()
             incidence_angle_correction(elevation_angle)
     """
-    def __init__(self, data_path, annotation_path, calibration_path, noise_path, band_name):
+    def __init__(self, data_path, annotation_path, calibration_path, noise_path, band_name, scale_noise):
         self.des = band_name.lower()
         self.img_max = 4 if self.des == 'hh' else -15
         self.img_min = -29 if self.des == 'hh' else -32
@@ -58,6 +58,7 @@ class Sentinel1Band(object):
         self.calibration_path = calibration_path
         self.annotation_path = annotation_path
         self.denoised = False
+        self.scale_noise = scale_noise
 
     def read_data(self):
         if type(self.data_path) is str:
@@ -110,9 +111,85 @@ class Sentinel1Band(object):
         if azimuth_noise:
             try:
                 self._read_azimuth_noise(noise_file)
+#                mean_noise = self.noise.mean()
+                if self.scale_noise:
+                    self.scale_noise_patches()
                 self.noise *= self.azimuth_noise
+#                noise_diff = mean_noise - self.noise.mean()
+#                print(mean_noise, self.noise.mean(), noise_diff)
+#                self.noise -= noise_diff
+                self.noise -= 3000
             except:
                 print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
+
+    def scale_noise_patches(self):
+        """ Calculate scale factors"""
+        swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
+        for swath in swath_list:
+            patches = [item for item in self.scalloping_lut if item['swath'] == swath]
+            if patches[0]['sample_max'] >= self.Y - 1:
+                continue
+            """ Calculate scale factor"""
+            curr_data = []
+            next_data = []
+            curr_noise = []
+            next_noise = []
+            pixel_count = []
+            for patch in patches:
+                th = 300 if self.des == 'hv' else 1000
+                nd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3]
+                nd[nd > th] = th
+                if nd.sum() == 0:
+                    continue
+                next_data.append(nd.sum())
+                cd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1]
+                cd[cd > th] = th
+                curr_data.append(cd.sum())
+                curr_noise.append(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].sum())
+                next_noise.append(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].sum())
+                pixel_count.append(cd.size)
+            size = sum(pixel_count)
+            scale = ((sum(curr_data) / size)**2 - (sum(next_data) / size)**2 + sum(next_noise) / size) / (sum(curr_noise) / size) * 0.9
+
+            """ Apply scale factor"""
+            for patch in patches:
+                self.noise[patch['line_min']:patch['line_max'], patch['sample_min']:patch['sample_max']] *= scale
+
+    '''
+        for patch in scalloping_lut:
+#            print(self.X, self.Y, patch['line_min'], patch['line_max'], patch['sample_min'], patch['sample_max'])
+            if patch['sample_max'] >= self.Y - 1:
+#            if patch['sample_min'] != 0:
+                continue
+
+            cd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1]
+            th = 300 if self.des == 'hv' else 1000
+            cd[cd > th] = th
+            curr_data = cd.mean()
+            nd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3]
+            nd[nd > th] = th
+            next_data = nd.mean()
+            curr_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
+            next_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
+            
+#            curr_data = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
+#            next_data = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
+#            curr_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
+#            next_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
+
+#            curr_data = np.median(self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1])
+#            next_data = np.median(self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3])
+#            curr_noise = np.median(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1])
+#            next_noise = np.median(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3])
+
+            if next_data == 0:
+                continue
+#            print(curr_data, next_data, curr_noise, next_noise)
+            scale = (curr_data**2 - next_data**2 + next_noise) / (curr_noise) * 0.9
+#            print(scale)
+            self.noise[patch['line_min']:patch['line_max'], patch['sample_min']:patch['sample_max']] *= scale
+#            self.noise[patch['line_min']:patch['line_max'], :patch['sample_max']] *= scale
+    '''
     
     def _read_azimuth_noise(self, noise_file):
         """ Read scalloping noise data.
@@ -120,13 +197,16 @@ class Sentinel1Band(object):
             If .SAFE folder is used as input for the Sentinel1Product then noise_file can be taken from self.noise_file.
         """
         self.scalloping_lut = [{'line_min': int(i[1].text), 'line_max': int(i[3].text), 'sample_min': int(i[2].text), 'sample_max': int(i[4].text),
-                                'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32)} for i in noise_file[2]]
-
+                                'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32),
+                                'swath': i[0].text} for i in noise_file[2]]
         """ Interpolate scalloping noise """
         self.azimuth_noise = np.zeros((self.X, self.Y), dtype=np.float32)
         for patch in self.scalloping_lut:
-            scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
-            noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
+            if len(patch['noise']) == 1:
+                noise_line = np.repeat(patch['noise'][0], patch['line_max'] - patch['line_min'] + 1)
+            else:
+                scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
+                noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
             self.azimuth_noise[patch['line_min']:patch['line_max'] + 1, patch['sample_min']:patch['sample_max'] + 1] = noise_line[:, np.newaxis]
 
     def read_calibration(self):
@@ -152,10 +232,12 @@ class Sentinel1Band(object):
         self.calibration_azimuth_list = [int(i) for i in calibration_file[2][0][2].text.split(' ')]
         self.calibration_range_list = [int(i) for i in [j[1].text for j in calibration_file[2]]]
 
-        gamma_interp = RectBivariateSpline(self.calibration_range_list, self.calibration_azimuth_list, self.gamma, kx=1, ky=1)
+#        gamma_interp = RectBivariateSpline(self.calibration_range_list, self.calibration_azimuth_list, self.gamma, kx=1, ky=1)
+        sigma0_interp = RectBivariateSpline(self.calibration_range_list, self.calibration_azimuth_list, self.sigma0, kx=1, ky=1)
         x_new = np.arange(0, self.X, 1, dtype=np.int16)
         y_new = np.arange(0, self.Y, 1, dtype=np.int16)
-        self.calibration = gamma_interp(x_new, y_new).astype(np.float32)
+#        self.calibration = gamma_interp(x_new, y_new).astype(np.float32)
+        self.calibration = sigma0_interp(x_new, y_new).astype(np.float32)
 
     def subtract_noise(self):
         """ Calibrated and denoised data is equal to
@@ -174,6 +256,7 @@ class Sentinel1Band(object):
         if not self.denoised:
             self.data = self.data**2 - self.noise
             self.data = self.data / self.calibration**2
+#            self.data /= 1000**2
             threshold = 1 / self.calibration.max()
             self.data[self.data < threshold] = threshold
             self.data = np.log10(self.data) * 10
@@ -224,7 +307,7 @@ class Sentinel1Product(object):
         It contains information about the scene and band data in Sentinel1Band objects (one object per band).
         Input is expected to be a path to a Sentinel-1 scene (both *.SAFE and *.zip are supported).
     """
-    def __init__(self, product_path):
+    def __init__(self, product_path, scale_noise=False):
         """ Set paths to auxilary data.
             Create Sentinel1Band object for each band in the product.
             Parse date and time of the product into self.timestamp
@@ -234,6 +317,7 @@ class Sentinel1Product(object):
         """
         try:
             self.product_name = os.path.basename(product_path).split('.')[0]
+            self.scale_noise = scale_noise
             print(self.product_path)
         except:
             pass
@@ -280,13 +364,13 @@ class Sentinel1Product(object):
             else:
                 name_string = a.name
             band_name = os.path.split(name_string)[1].split('-')[3].upper()
-            setattr(self, band_name, Sentinel1Band(d, a, c, n, band_name))
+            setattr(self, band_name, Sentinel1Band(d, a, c, n, band_name, self.scale_noise))
 
         """ Create datetime object """
         self.timestamp = scene_time(product_path)
         
         try:
-            import gdal
+            from osgeo import gdal
             if self.zip:
                 p_gdal = gdal.Open('/vsizip/' + os.path.join(product_path, data_files[0]))
             else:
@@ -498,8 +582,8 @@ class Sentinel1Product(object):
 
 def _read_single_band(band, keep_calibration_data=True):
     band.read_data()
-    band.read_noise()
     band.read_calibration()
+    band.read_noise()
     band.subtract_noise()
     if not keep_calibration_data:
         band.noise = False

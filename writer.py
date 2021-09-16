@@ -3,7 +3,7 @@ Create a geotiff with GCPs copied from the original Sentinel-1 scene.
 
 autor: Dmitrii Murashkin
 """
-import gdal
+from osgeo import gdal
 import numpy as np
 
 
