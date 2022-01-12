@@ -28,11 +28,11 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noi
     write_data_geotiff(img, output_path, p.gdal_data)
 
 
-def rgb(input_path, output_path, speckle_filter=True, **kwargs):
+def rgb(input_path, output_path, speckle_filter=True, scale_noise=False, **kwargs):
     """ Create an RBG image from calibrated HH, HV and HV/HH bands of the specified Sentinel-1 product.
     """
     try:
-        p = Sentinel1Product(input_path)
+        p = Sentinel1Product(input_path, scale_noise=scale_noise)
     except:
         print('Error reading {0}'.format(input_path))
         return False

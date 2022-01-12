@@ -6,7 +6,7 @@ import os
 import sys
 import time
 
-from to_geotiff import rgb, grayscale, calibrated
+from sentinel1_routines.to_geotiff import rgb, grayscale, calibrated
 
 
 if __name__ == "__main__":
