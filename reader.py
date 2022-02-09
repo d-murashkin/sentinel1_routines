@@ -118,7 +118,7 @@ class Sentinel1Band(object):
 #                noise_diff = mean_noise - self.noise.mean()
 #                print(mean_noise, self.noise.mean(), noise_diff)
 #                self.noise -= noise_diff
-                self.noise -= 3000
+                self.noise -= 1000
             except:
                 print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
 
@@ -346,7 +346,7 @@ class Sentinel1Product(object):
                 zipdata = zipfile.ZipFile(product_path)
                 data_files = sorted([item for item in zipdata.namelist() if 'measurement' in item and '.tif' in item], key=_band_number)
                 xml_files = [item for item in zipdata.namelist() if '.xml' in item]
-                annotation_files = sorted([item for item in xml_files if 'annotation' in item and 'calibration' not in item], key=_band_number)
+                annotation_files = sorted([item for item in xml_files if 'annotation' in item and 'calibration' not in item and 'rfi' not in item], key=_band_number)
                 noise_files = sorted([item for item in xml_files if 'noise' in item], key=_band_number)
                 calibration_files = sorted([item for item in xml_files if 'calibration' in item and 'noise' not in item], key=_band_number)
                 self.data_files = [zipdata.open(item) for item in data_files]
