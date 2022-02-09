@@ -93,7 +93,7 @@ def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_dat
     return True
 
 
-def download_single_scene(scene_name, root_folder=False, output_folder='./'):
+def download_single_scene(scene_name, root_folder=False, output_folder='./', show_progress=True):
     scene_name = scene_name.split('.')[0]
     '''
     if root_folder:
@@ -127,7 +127,11 @@ def download_single_scene(scene_name, root_folder=False, output_folder='./'):
 
     cwd = os.getcwd()
     os.chdir(download_path)
-    subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    if show_progress:
+        subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    else:
+        """ Turn off --show-progress option for wget older then 1.16"""
+        subprocess.call('wget -c -q --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
     os.chdir(cwd)
     return True
 
