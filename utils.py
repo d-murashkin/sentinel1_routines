@@ -14,11 +14,11 @@ def scene_time(scene_path):
         returns a sorted by time list of scenes in the <input_folder>.
     """
     scene_name = os.path.basename(scene_path)
+    date_format = '%Y%m%dT%H%M%S'
     try:
         date_string = scene_name.split('_')[4]
-        date_format = '%Y%m%dT%H%M%S'
         date = datetime.datetime.strptime(date_string, date_format)
     except IndexError:
-        print('Date {0} does not correspond to {1} format.'.format(date_string, date_format))
+        print('Date of "{0}" does not correspond to {1} format.'.format(scene_name, date_format))
         return False
     return date
