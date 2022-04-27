@@ -111,14 +111,9 @@ class Sentinel1Band(object):
         if azimuth_noise:
             try:
                 self._read_azimuth_noise(noise_file)
-#                mean_noise = self.noise.mean()
                 if self.scale_noise:
                     self.scale_noise_patches()
                 self.noise *= self.azimuth_noise
-#                noise_diff = mean_noise - self.noise.mean()
-#                print(mean_noise, self.noise.mean(), noise_diff)
-#                self.noise -= noise_diff
-                self.noise -= 1000
             except:
                 print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
 
@@ -155,42 +150,6 @@ class Sentinel1Band(object):
             for patch in patches:
                 self.noise[patch['line_min']:patch['line_max'], patch['sample_min']:patch['sample_max']] *= scale
 
-    '''
-        for patch in scalloping_lut:
-#            print(self.X, self.Y, patch['line_min'], patch['line_max'], patch['sample_min'], patch['sample_max'])
-            if patch['sample_max'] >= self.Y - 1:
-#            if patch['sample_min'] != 0:
-                continue
-
-            cd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1]
-            th = 300 if self.des == 'hv' else 1000
-            cd[cd > th] = th
-            curr_data = cd.mean()
-            nd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3]
-            nd[nd > th] = th
-            next_data = nd.mean()
-            curr_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
-            next_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
-            
-#            curr_data = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
-#            next_data = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
-#            curr_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1].mean()
-#            next_noise = self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].mean()
-
-#            curr_data = np.median(self.data[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1])
-#            next_data = np.median(self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3])
-#            curr_noise = np.median(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] - 1:patch['sample_max'] + 1])
-#            next_noise = np.median(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3])
-
-            if next_data == 0:
-                continue
-#            print(curr_data, next_data, curr_noise, next_noise)
-            scale = (curr_data**2 - next_data**2 + next_noise) / (curr_noise) * 0.9
-#            print(scale)
-            self.noise[patch['line_min']:patch['line_max'], patch['sample_min']:patch['sample_max']] *= scale
-#            self.noise[patch['line_min']:patch['line_max'], :patch['sample_max']] *= scale
-    '''
-    
     def _read_azimuth_noise(self, noise_file):
         """ Read scalloping noise data.
             The noise file should be passed here for support of zip-archives.
