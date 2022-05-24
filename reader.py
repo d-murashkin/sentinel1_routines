@@ -104,16 +104,16 @@ class Sentinel1Band(object):
             cf = ElementTree.parse(self.calibration_path).getroot()
             DN = float(cf[2][0][6].text.split(' ')[0])
             self.noise *= 56065.87 * DN
-        
+
         """ Second, take into account noise in the azimuth direction (if possible).
             According https://qc.sentinel1.eo.esa.int/ipf/ only products taken after 13 March 2018 containg this information. """
         if azimuth_noise:
             try:
                 self._read_azimuth_noise(noise_file)
                 self.noise *= self.azimuth_noise
-            except:
+            except Exception:
                 print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
-    
+
     def _read_azimuth_noise(self, noise_file):
         """ Read scalloping noise data.
             The noise file should be passed here for support of zip-archives.
@@ -235,7 +235,7 @@ class Sentinel1Product(object):
         try:
             self.product_name = os.path.basename(product_path).split('.')[0]
             print(self.product_path)
-        except:
+        except Exception:
             pass
 
         def _band_number(x):
@@ -269,10 +269,10 @@ class Sentinel1Product(object):
                 self.annotation_files = [zipdata.open(item) for item in annotation_files]
                 self.noise_files = [zipdata.open(item) for item in noise_files]
                 self.calibration_files = [zipdata.open(item) for item in calibration_files]
-            except:
+            except Exception:
                 print('Zip file reading error.')
                 return False
-        
+
         """ Create a Sentinel1Band object for each band in the product. """
         for d, a, c, n in zip(self.data_files, self.annotation_files, self.calibration_files, self.noise_files):
             if type(a) == str:
@@ -284,9 +284,9 @@ class Sentinel1Product(object):
 
         """ Create datetime object """
         self.timestamp = scene_time(product_path)
-        
+
         try:
-            import gdal
+            from osgeo import gdal
             if self.zip:
                 p_gdal = gdal.Open('/vsizip/' + os.path.join(product_path, data_files[0]))
             else:
@@ -295,7 +295,7 @@ class Sentinel1Product(object):
                               'Y': p_gdal.GetRasterBand(1).YSize,
                               'GCPs': p_gdal.GetGCPs(),
                               'GCP_proj': p_gdal.GetGCPProjection()}
-        except:
+        except Exception:
             pass
 
     def detect_borders(self):
@@ -317,16 +317,16 @@ class Sentinel1Product(object):
 
         self.x_min = max(hh_left_lim, hv_left_lim)
         self.x_max = min(hh_right_lim, hv_right_lim)
-    
+
     def _find_border_coordinates(self, band_object, threshold_value):
         hh_vertical_means = self.HH.data.mean(axis=0)
         try:
             hh_left_lim = np.where(hh_vertical_means[:200] < threshold_value)[0][-1]
-        except:
+        except Exception:
             hh_left_lim = None
         try:
             hh_right_lim = hh_vertical_means.shape[0] - 200 + np.where(hh_vertical_means[-200:] < 100)[0][0]
-        except:
+        except Exception:
             hh_right_lim = None
         return hh_left_lim, hh_right_lim
 
@@ -369,7 +369,7 @@ class Sentinel1Product(object):
         ran = int(len(self.GCPs) / gcps_per_line)
         xs = np.array([i['line'] for i in self.GCPs])[::gcps_per_line]
         ys = np.array([i['pixel'] for i in self.GCPs])[:gcps_per_line]
-        
+
         gcp_data = np.array([i[parameter] for i in self.GCPs], dtype=np.float32)
         gcp_data_spline = RectBivariateSpline(xs, ys, gcp_data.reshape(ran, gcps_per_line), kx=1, ky=1)
         x_new = np.arange(0, self.HH.X, 1, dtype=np.int16)
@@ -379,7 +379,7 @@ class Sentinel1Product(object):
             result = result[:, self.gdal_data['x_min']:self.gdal_data['x_max']]
         setattr(self, parameter, result)
         return True
-    
+
     def interpolate_latitude(self, gcps_per_line=21):
         if hasattr(self, 'latitude'):
             print('Latitudes have already been interpolated.')
@@ -409,7 +409,7 @@ class Sentinel1Product(object):
             print('Incidence angles have already been interpolated.')
             return True
         self.interpolate_GCP_parameter('incidence_angle', gcps_per_line=gcps_per_line)
-    
+
     def is_shifted(self):
         """ Check if first lines of swaths ara shifted relative to each other (black steps on top or at the bottom of the image)
         """
@@ -434,7 +434,7 @@ class Sentinel1Product(object):
             band_list = [self.HH]
         elif band.lower() == 'hv':
             band_list = [self.HV]
-        
+
         _rsb = partial(_read_single_band, keep_calibration_data=keep_calibration_data)
         if not parallel:
             list(map(_rsb, band_list))
@@ -443,7 +443,7 @@ class Sentinel1Product(object):
             pool.map(_rsb, band_list)
             pool.close()
             pool.join()
-        
+
         """ Incidence angle correction. """
         if incidence_angle_correction:
             self.read_GCPs()
@@ -458,10 +458,10 @@ class Sentinel1Product(object):
         for band in band_list:
             band.nofinite_data_mask = np.where(np.isfinite(band.data), False, True)
             band.data[band.nofinite_data_mask] = nofinite_data_val
-        
+
         """ Save nodata mask to self.gdal_data for further data writing. """
         self.gdal_data['nodata_mask'] = self.HH.nodata_mask
-        
+
         if crop_borders:
             self.crop_borders()
         return True
@@ -490,11 +490,11 @@ class Sentinel1Product(object):
                     if type(attr) != np.ndarray:
                         continue
                     setattr(band, item, getattr(band, item)[:, self.x_min:self.x_max])
-    
+
     def orbit_direction(self):
         annotation_file = ElementTree.parse(self.annotation_files[0]).getroot()
         return annotation_file[2][0][0].text.lower()
-    
+
 
 def _read_single_band(band, keep_calibration_data=True):
     band.read_data()
