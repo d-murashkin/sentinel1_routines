@@ -3,7 +3,7 @@ Create a geotiff with GCPs copied from the original Sentinel-1 scene.
 
 autor: Dmitrii Murashkin
 """
-import gdal
+from osgeo import gdal
 import numpy as np
 
 
@@ -32,7 +32,7 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
 
     try:
         datatype = datatype_mapping[input_data.dtype.name]
-    except:
+    except Exception:
         print('Unsupported datatype {0} for the input array.'.format(input_data.dtype))
         return False
 
@@ -55,13 +55,13 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
             data_to_write[:, gdal_data['x_min'] // dec:gdal_data['x_min'] // dec + layer.shape[1]] = np.squeeze(layer)
         else:
             data_to_write = np.squeeze(layer)
-        
+
         if 'nodata_mask' in gdal_data:
             mask = gdal_data['nodata_mask'][:out_y * dec:dec, :out_x * dec:dec]
             data_to_write[mask] = nodata_val
 
         band.WriteArray(data_to_write)
-    
+
     out.FlushCache()
 
 
