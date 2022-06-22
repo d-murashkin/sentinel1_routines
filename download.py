@@ -24,6 +24,7 @@ def set_dir(dir_path):
     return dir_path
 
 
+"""
 def download_single_scene(scene_name, root_folder=False, output_folder='./'):
     scene_name = scene_name.split('.')[0]
     '''
@@ -59,6 +60,44 @@ def download_single_scene(scene_name, root_folder=False, output_folder='./'):
     cwd = os.getcwd()
     os.chdir(download_path)
     subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    os.chdir(cwd)
+    return True
+"""
+
+
+def download_single_scene(scene_name, root_folder=False, output_folder='./'):
+    scene_name = scene_name.split('.')[0]
+    if not root_folder:
+        download_path = output_folder
+    else:
+        if root_folder is True:
+            try:
+                root_folder = os.environ['S1PATH']
+            except Exception:
+                print('Could not read $S1PATH environment variable.')
+                return False
+        download_path = get_scene_folder(scene_name, root_folder)
+
+    try:
+        asf_credentials = os.environ['ASF_CREDENTIALS']
+        with open(asf_credentials) as f:
+            username = f.readline()[:-1]
+            passwd = f.readline()[:-1]
+    except Exception:
+        print('No credentials provided.')
+        return False
+
+    cwd = os.getcwd()
+    os.chdir(download_path)
+#    subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
+    search_string = 'https://api.daac.asf.alaska.edu/services/search/param?'
+    scene_type = scene_name.split('_')[2]
+    if len(scene_type) != 3:
+        scene_type = '{0}_{1}{2}'.format(scene_type[:3], scene_type[3], scene_name.split('_')[3][2])
+    search_string += 'product_list={0}-{1}'.format(scene_name, scene_type)
+    print(search_string)
+    call = f'aria2c --http-auth-challenge=true --http-user={username} --http-passwd={passwd} --check-integrity=true --max-tries=0 --max-concurrent-downloads=3 "{search_string}"'
+    subprocess.call(call, shell=True)
     os.chdir(cwd)
     return True
 
