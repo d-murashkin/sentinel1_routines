@@ -7,7 +7,7 @@ from osgeo import gdal
 import numpy as np
 
 
-def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
+def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0, colortable={}):
     X = gdal_data['X']
     Y = gdal_data['Y']
     proj = gdal_data['GCP_proj']
@@ -61,7 +61,19 @@ def write_data_geotiff(input_data, output_path, gdal_data, dec=1, nodata_val=0):
             data_to_write[mask] = nodata_val
 
         band.WriteArray(data_to_write)
-
+    
+    """Set up colortable if specified."""
+    try:
+        if colortable:
+            b = out.GetRasterBand(1)
+            colors = gdal.ColorTable()
+            [colors.SetColorEntry(val, colortable[val]) for val in colortable]
+            b.SetRasterColorTable(colors)
+            b.SetRasterColorInterpretation(gdal.GCI_PaletteIndex)
+    except:
+        print('Failed to apply colortable. Gray values are used instead.')
+        pass
+    
     out.FlushCache()
 
 

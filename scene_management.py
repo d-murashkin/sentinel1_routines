@@ -16,7 +16,11 @@ def get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folde
         and optionally ensure its existence (create folders if needed).
     """
     scene_name = scene_name.split('.')[0]
-    date = scene_time(scene_name)
+    try:
+        date = scene_time(scene_name)
+    except:
+        print('Could not recognize timestamp for {0}'.format(scene_name))
+        return False
     
     return get_date_folder(date, root_folder, ensure_existence, extra_folder)
 

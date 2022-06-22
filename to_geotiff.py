@@ -6,11 +6,14 @@ from .reader import Sentinel1Product
 from .writer import write_data_geotiff
 
 
-def grayscale(input_path, output_path, band='hh', speckle_filter=True, **kwargs):
+def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noise=False, nodata_value=0, **kwargs):
     """ Create a calibrated geotiff image for the specified Sentinel-1 product and band.
     """
-    p = Sentinel1Product(input_path)
-    p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
+    try:
+        p = Sentinel1Product(input_path, scale_noise=scale_noise)
+        p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
+    except:
+        return False
     if band.lower() == 'hh':
         p.HH.clip_normalize()
         img = p.HH.data
@@ -23,20 +26,21 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, **kwargs)
             img = cv2.bilateralFilter(img, 5, 15, 15)
         except:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
-    img *= 255
-    img = img.astype(np.uint8)
-    write_data_geotiff(img, output_path, p.gdal_data)
+    img *= 250
+    img = img.astype(np.uint8) + 1
+    write_data_geotiff(img, output_path, p.gdal_data, nodata_val=nodata_value)
+    return True
 
 
-def rgb(input_path, output_path, speckle_filter=True, **kwargs):
+def rgb(input_path, output_path, speckle_filter=True, scale_noise=False, nodata_value=0, **kwargs):
     """ Create an RBG image from calibrated HH, HV and HV/HH bands of the specified Sentinel-1 product.
     """
     try:
-        p = Sentinel1Product(input_path)
+        p = Sentinel1Product(input_path, scale_noise=scale_noise)
+        p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
     except:
         print('Error reading {0}'.format(input_path))
         return False
-    p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
     p.HH.clip_normalize(extend=False)
     p.HV.clip_normalize(extend=False)
     ratio = p.HV.data - p.HH.data
@@ -53,22 +57,37 @@ def rgb(input_path, output_path, speckle_filter=True, **kwargs):
             img = cv2.bilateralFilter(img, 5, 15, 15)
         except:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
-    img *= 255
-    img = img.astype(np.uint8)
-    write_data_geotiff(img, output_path, p.gdal_data)
+    img *= 250
+    img = img.astype(np.uint8) + 1
+    write_data_geotiff(img, output_path, p.gdal_data, nodata_val=nodata_value)
+    return True
 
 
-def calibrated(input_path, output_path, save_incidence_angle=False, **kwargs):
+def calibrated(input_path, output_path, save_incidence_angle=False, band='both', **kwargs):
     """ Create a geotiff with calibrated data (in dB).
     """
-    p = Sentinel1Product(input_path)
-    p.read_data(keep_calibration_data=True, crop_borders=False, **kwargs)
-    bands = [p.HH.data, p.HV.data]
+    try:
+        p = Sentinel1Product(input_path)
+        p.read_data(keep_calibration_data=True, crop_borders=False, **kwargs)
+    except:
+        print('Error reading {0}'.format(input_path))
+        return False
+
+    if band.lower() == 'both':
+        bands = [p.HH.data, p.HV.data]
+    elif band.lower() == 'hh':
+        bands = [p.HH.data]
+    elif band.lower() == 'hv':
+        bands = [p.HV.data]
+    else:
+        print('Wrong band type: {0}.'.format(band))
+        print('Choose one of the following: both, hh, hv.')
     if save_incidence_angle:
         p.interpolate_incidence_angle()
         bands.append(p.incidence_angle)
     data = np.stack(bands, axis=2)
     write_data_geotiff(data, output_path, p.gdal_data)
+    return True
 
 
 if __name__ == "__main__":
