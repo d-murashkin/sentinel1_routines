@@ -277,16 +277,20 @@ class Sentinel1Band(object):
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
         for swath in swath_list:
             patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
-            if patches[0]['line_min'] > 0:
-                """ extend upper part """
-                patch = patches[0]
-                edge_line = patch['line_min'] + 1
-                self.data[:edge_line, patch['sample_min'] - 1:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 1:patch['sample_max'] + 1], axis=0)
             if patches[-1]['line_max'] < self.X - 1:
                 """ extend lower part """
                 patch = patches[-1]
-                edge_line = patch['line_max'] - 1
-                self.data[edge_line + 1:, patch['sample_min'] - 1:patch['sample_max'] + 1] = np.flip(self.data[edge_line * 2 - 1 - self.X:edge_line, patch['sample_min'] - 1:patch['sample_max'] + 1], axis=0)
+                edge_line = patch['line_max'] - 3
+                self.data[edge_line + 1:, patch['sample_min'] - 2:patch['sample_max'] + 2] = np.flip(self.data[edge_line * 2 - 1 - self.X:edge_line, patch['sample_min'] - 2:patch['sample_max'] + 2], axis=0)
+
+        swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=False)
+        for swath in swath_list:
+            patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
+            if patches[0]['line_min'] > 0:
+                """ extend upper part """
+                patch = patches[0]
+                edge_line = patch['line_min'] + 3
+                self.data[:edge_line, patch['sample_min'] - 2:patch['sample_max'] + 2] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 2:patch['sample_max'] + 2], axis=0)
     
     def detect_borders(self):
         data = self.subtract_noise(in_place=False)
