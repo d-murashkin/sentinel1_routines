@@ -130,7 +130,7 @@ def download_single_scene(scene_name, root_folder=False, output_folder='./', sho
     if show_progress:
         subprocess.call('wget -c -q --show-progress --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
     else:
-        """ Turn off --show-progress option for wget older then 1.16"""
+        ''' Turn off --show-progress option for wget older then 1.16 '''
         subprocess.call('wget -c -q --http-user={0} --http-password={1} "https://datapool.asf.alaska.edu/GRD_MD/S{2}/{3}.zip"'.format(username, passwd, scene_name[2], scene_name), shell=True)
     os.chdir(cwd)
     return True
