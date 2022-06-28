@@ -305,11 +305,11 @@ class Sentinel1Band(object):
     def _find_border_coordinates(self, data, threshold_value):
         vertical_quantile = np.quantile(data, 0.24, axis=0)
         try:
-            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 2
+            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 3
         except Exception:
             left_lim = 0
         try:
-            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 3
+            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 4
         except Exception:
             right_lim = vertical_quantile.shape[0]
         return left_lim, right_lim
