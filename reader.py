@@ -263,6 +263,19 @@ class Sentinel1Band(object):
         self.calibration = None
         self.noise = None
         self.elevation_angle = None
+    
+    def fill_nodata(self):
+        swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
+        for swath in swath_list:
+            patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
+            if patches[0]['line_min'] > 0:
+                """ extend upper part """
+                patch = patches[0]
+                self.data[:patch['line_min'], patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_min']:patch['line_min'] * 2, patch['sample_min']:patch['sample_max']], axis=0)
+            if patches[-1]['line_max'] < self.X:
+                """ extend lower part """
+                patch = patches[-1]
+                self.data[patch['line_max']:, patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_max']:patch['line_max'] * 2 - self.X:-1, patch['sample_min']:patch['sample_max']], axis=0)
 
 
 class Sentinel1Product(object):
@@ -541,6 +554,16 @@ class Sentinel1Product(object):
     def orbit_direction(self):
         annotation_file = ElementTree.parse(self.annotation_files[0]).getroot()
         return annotation_file[2][0][0].text.lower()
+    
+    def fill_nodata(self):
+        try:
+            self.HH.fill_nodata()
+        except Exception:
+            pass
+        try:
+            self.HV.fill_nodata()
+        except Exception:
+            pass
 
 
 def _read_single_band(band, keep_calibration_data=True):
