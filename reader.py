@@ -366,14 +366,15 @@ class Sentinel1Product(object):
             Return border coordinates, that can be used for slising: img[min_lim:max_lim] returns
             image without border noise.
         """
-        """ Set thresholds to 100 for HH and 40 for HV band, check 200 columns from edges """
+        """ Set thresholds to -32dB for HH left, -27dB for HH right and -32db for HV band, check 200 columns from edges """
         if hasattr(self.HH, 'data'):
-            hh_left_lim, hh_right_lim = self._find_border_coordinates(self.HH, 100)
+            hh_left_lim, _ = self._find_border_coordinates(self.HH, -32)
+            _, hh_right_lim = self._find_border_coordinates(self.HH, -27)
         else:
             hh_left_lim = hh_right_lim = None
 
         if hasattr(self.HV, 'data'):
-            hv_left_lim, hv_right_lim = self._find_border_coordinates(self.HV, 40)
+            hv_left_lim, hv_right_lim = self._find_border_coordinates(self.HV, -32)
         else:
             hv_left_lim = hv_right_lim = None
 
@@ -381,16 +382,19 @@ class Sentinel1Product(object):
         self.x_max = min(hh_right_lim, hv_right_lim)
 
     def _find_border_coordinates(self, band_object, threshold_value):
-        hh_vertical_means = self.HH.data.mean(axis=0)
+        vertical_quantile = np.quantile(band_object.data, 0.24, axis=0)
         try:
-            hh_left_lim = np.where(hh_vertical_means[:200] < threshold_value)[0][-1]
+            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 2
+            print(vertical_quantile[:200])
+            print(np.where(vertical_quantile[:200] < threshold_value, True, False))
+            print(left_lim)
         except Exception:
-            hh_left_lim = None
+            left_lim = 0
         try:
-            hh_right_lim = hh_vertical_means.shape[0] - 200 + np.where(hh_vertical_means[-200:] < 100)[0][0]
+            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 3
         except Exception:
-            hh_right_lim = None
-        return hh_left_lim, hh_right_lim
+            right_lim = vertical_quantile.shape[0]
+        return left_lim, right_lim
 
     def read_GCPs(self):
         """ Parse Ground Control Points (GCPs) from the annotation file.
