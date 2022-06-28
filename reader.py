@@ -154,12 +154,14 @@ class Sentinel1Band(object):
         """ Read scalloping noise data.
             The noise file should be passed here for support of zip-archives.
             If .SAFE folder is used as input for the Sentinel1Product then noise_file can be taken from self.noise_file.
+            If scalloping noise information exists, also use patches to produce a precise nodata mask.
         """
         self.scalloping_lut = [{'line_min': int(i[1].text), 'line_max': int(i[3].text), 'sample_min': int(i[2].text), 'sample_max': int(i[4].text),
                                 'lines': np.array(i[5].text.split(' '), dtype=np.int16), 'noise': np.array(i[6].text.split(' '), dtype=np.float32),
                                 'swath': i[0].text} for i in noise_file[2]]
         """ Interpolate scalloping noise """
         self.azimuth_noise = np.zeros((self.X, self.Y), dtype=np.float32)
+        nodata_mask = np.ones((self.X, self.Y), dtype=np.bool)
         for patch in self.scalloping_lut:
             if len(patch['noise']) == 1:
                 noise_line = np.repeat(patch['noise'][0], patch['line_max'] - patch['line_min'] + 1)
@@ -167,6 +169,8 @@ class Sentinel1Band(object):
                 scalloping = interp1d(patch['lines'], patch['noise'], kind='linear', fill_value='extrapolate')
                 noise_line = scalloping(np.arange(patch['line_min'], patch['line_max'] + 1))
             self.azimuth_noise[patch['line_min']:patch['line_max'] + 1, patch['sample_min']:patch['sample_max'] + 1] = noise_line[:, np.newaxis]
+            nodata_mask[patch['line_min']:patch['line_max'] + 1, patch['sample_min']:patch['sample_max'] + 1] = False
+        self.nodata_mask = nodata_mask
 
     def read_calibration(self):
         """ Read calibration table from product folder.
