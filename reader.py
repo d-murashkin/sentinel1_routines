@@ -263,7 +263,7 @@ class Sentinel1Band(object):
         self.calibration = None
         self.noise = None
         self.elevation_angle = None
-    
+
     def fill_nodata(self):
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
         for swath in swath_list:
@@ -275,7 +275,7 @@ class Sentinel1Band(object):
             if patches[-1]['line_max'] < self.X:
                 """ extend lower part """
                 patch = patches[-1]
-                self.data[patch['line_max']:, patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_max']:patch['line_max'] * 2 - self.X:-1, patch['sample_min']:patch['sample_max']], axis=0)
+                self.data[patch['line_max']:, patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_max'] * 2 - self.X:patch['line_max'], patch['sample_min']:patch['sample_max']], axis=0)
 
 
 class Sentinel1Product(object):
@@ -554,7 +554,7 @@ class Sentinel1Product(object):
     def orbit_direction(self):
         annotation_file = ElementTree.parse(self.annotation_files[0]).getroot()
         return annotation_file[2][0][0].text.lower()
-    
+
     def fill_nodata(self):
         try:
             self.HH.fill_nodata()
