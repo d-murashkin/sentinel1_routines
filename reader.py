@@ -81,6 +81,10 @@ class Sentinel1Band(object):
 
         """ First, deal with noise in the range direction. """
         noise_file = ElementTree.parse(self.noise_path).getroot()
+        try:
+            self.noise_path.seek(0)
+        except Exception:
+            pass
         noise = np.array([j for i in noise_file[1] for j in i[3].text.split(' ')], dtype=np.float32)
         noise_y = np.array([j for i in noise_file[1] for j in i[2].text.split(' ')], dtype=np.int16)
         noise_x = np.array([i[1].text for i in noise_file[1] for j in range(int(i[2].get('count')))], dtype=np.int16)
@@ -202,7 +206,7 @@ class Sentinel1Band(object):
 #        self.calibration = gamma_interp(x_new, y_new).astype(np.float32)
         self.calibration = sigma0_interp(x_new, y_new).astype(np.float32)
 
-    def subtract_noise(self):
+    def subtract_noise(self, in_place=True):
         """ Calibrated and denoised data is equal to
             (data**2 - Noise) / Calibration**2
         """
@@ -217,15 +221,20 @@ class Sentinel1Band(object):
             return False
 
         if not self.denoised:
-            self.data = self.data**2 - self.noise
-            self.data = self.data / self.calibration**2
-#            self.data /= 1000**2
+            data = self.data**2 - self.noise
+            data = data / self.calibration**2
             threshold = 1 / self.calibration.max()
-            self.data[self.data < threshold] = threshold
-            self.data = np.log10(self.data) * 10
-            self.denoised = True
+            data[data < threshold] = threshold
+            data = np.log10(data) * 10
         else:
             print('Product is already denoised.')
+        
+        if in_place:
+            self.data = data
+            self.denoised = True
+            return True
+        else:
+            return data
 
     def normalize(self, output_range=[0, 1], extend=True):
         """ Scale data to output_range.
@@ -278,6 +287,28 @@ class Sentinel1Band(object):
                 patch = patches[-1]
                 edge_line = patch['line_max'] - 1
                 self.data[edge_line + 1:, patch['sample_min'] - 1:patch['sample_max'] + 1] = np.flip(self.data[edge_line * 2 - 1 - self.X:edge_line, patch['sample_min'] - 1:patch['sample_max'] + 1], axis=0)
+    
+    def detect_borders(self):
+        data = self.subtract_noise(in_place=False)
+        if self.des.lower() == 'hh':
+            self.left_lim, _ = self._find_border_coordinates(data, -32)
+            _, self.right_lim = self._find_border_coordinates(data, -27)
+        elif self.des.lower() == 'hv':
+            self.left_lim, self.right_lim = self._find_border_coordinates(data, -32)
+        else:
+            pass
+
+    def _find_border_coordinates(self, data, threshold_value):
+        vertical_quantile = np.quantile(data, 0.24, axis=0)
+        try:
+            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 2
+        except Exception:
+            left_lim = 0
+        try:
+            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 3
+        except Exception:
+            right_lim = vertical_quantile.shape[0]
+        return left_lim, right_lim
 
 
 class Sentinel1Product(object):
@@ -367,34 +398,15 @@ class Sentinel1Product(object):
             image without border noise.
         """
         """ Set thresholds to -32dB for HH left, -27dB for HH right and -32db for HV band, check 200 columns from edges """
-        if hasattr(self.HH, 'data'):
-            hh_left_lim, _ = self._find_border_coordinates(self.HH, -32)
-            _, hh_right_lim = self._find_border_coordinates(self.HH, -27)
+        if hasattr(self.HH, 'data') and hasattr(self.HV, 'data'):
+            self.x_min = max(self.HH.left_lim, self.HV.left_lim)
+            self.x_max = min(self.HH.right_lim, self.HV.right_lim)
         else:
-            hh_left_lim = hh_right_lim = None
+            if hasattr(self.HV, 'data'):
+                self.x_min, self.x_max = self.HV.left_lim, self.HV.right_lim
+            if hasattr(self.HH, 'data'):
+                self.x_min, self.x_max = self.HH.left_lim, self.HH.right_lim
 
-        if hasattr(self.HV, 'data'):
-            hv_left_lim, hv_right_lim = self._find_border_coordinates(self.HV, -32)
-        else:
-            hv_left_lim = hv_right_lim = None
-
-        self.x_min = max(hh_left_lim, hv_left_lim)
-        self.x_max = min(hh_right_lim, hv_right_lim)
-
-    def _find_border_coordinates(self, band_object, threshold_value):
-        vertical_quantile = np.quantile(band_object.data, 0.24, axis=0)
-        try:
-            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 2
-            print(vertical_quantile[:200])
-            print(np.where(vertical_quantile[:200] < threshold_value, True, False))
-            print(left_lim)
-        except Exception:
-            left_lim = 0
-        try:
-            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 3
-        except Exception:
-            right_lim = vertical_quantile.shape[0]
-        return left_lim, right_lim
 
     def read_GCPs(self):
         """ Parse Ground Control Points (GCPs) from the annotation file.
@@ -575,6 +587,11 @@ class Sentinel1Product(object):
 def _read_single_band(band, keep_calibration_data=True):
     band.read_data()
     band.read_calibration()
+    band.read_noise(azimuth_noise=False)
+    try:
+        band.detect_borders()
+    except Exception:
+        pass
     band.read_noise()
     band.subtract_noise()
     if not keep_calibration_data:
