@@ -271,11 +271,13 @@ class Sentinel1Band(object):
             if patches[0]['line_min'] > 0:
                 """ extend upper part """
                 patch = patches[0]
-                self.data[:patch['line_min'], patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_min']:patch['line_min'] * 2, patch['sample_min']:patch['sample_max']], axis=0)
-            if patches[-1]['line_max'] < self.X:
+                edge_line = patch['line_min'] + 1
+                self.data[:edge_line, patch['sample_min'] - 1:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 1:patch['sample_max'] + 1], axis=0)
+            if patches[-1]['line_max'] < self.X - 1:
                 """ extend lower part """
                 patch = patches[-1]
-                self.data[patch['line_max']:, patch['sample_min']:patch['sample_max']] = np.flip(self.data[patch['line_max'] * 2 - self.X:patch['line_max'], patch['sample_min']:patch['sample_max']], axis=0)
+                edge_line = patch['line_max'] - 1
+                self.data[edge_line + 1:, patch['sample_min'] - 1:patch['sample_max'] + 1] = np.flip(self.data[edge_line * 2 - 1 - self.X:edge_line, patch['sample_min'] - 1:patch['sample_max'] + 1], axis=0)
 
 
 class Sentinel1Product(object):
