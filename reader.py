@@ -274,23 +274,24 @@ class Sentinel1Band(object):
         self.elevation_angle = None
 
     def fill_nodata(self):
+        """ extend lower part """
+        offset = 0
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
         for swath in swath_list:
             patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
-            if patches[-1]['line_max'] < self.X - 1:
-                """ extend lower part """
-                patch = patches[-1]
-                edge_line = patch['line_max'] - 3
-                self.data[edge_line + 1:, patch['sample_min'] - 2:patch['sample_max'] + 2] = np.flip(self.data[edge_line * 2 - 1 - self.X:edge_line, patch['sample_min'] - 2:patch['sample_max'] + 2], axis=0)
+            patch = patches[-1]
+            if patch['line_max'] < self.X - 1 - offset:
+                edge_line = patch['line_max'] - 1 - offset
+                self.data[edge_line + 1:, patch['sample_min'] - 0:patch['sample_max'] + 1] = np.flip(self.data[edge_line * 2 + 1 - self.X:edge_line, patch['sample_min'] - 0:patch['sample_max'] + 1], axis=0)
 
+        """ extend upper part """
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=False)
         for swath in swath_list:
             patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
-            if patches[0]['line_min'] > 0:
-                """ extend upper part """
-                patch = patches[0]
-                edge_line = patch['line_min'] + 3
-                self.data[:edge_line, patch['sample_min'] - 2:patch['sample_max'] + 2] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 2:patch['sample_max'] + 2], axis=0)
+            patch = patches[0]
+            if patch['line_min'] > 0:
+                edge_line = patch['line_min'] + offset
+                self.data[:edge_line, patch['sample_min'] - 0:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 0:patch['sample_max'] + 1], axis=0)
     
     def detect_borders(self):
         data = self.subtract_noise(in_place=False)
@@ -581,10 +582,12 @@ class Sentinel1Product(object):
         try:
             self.HH.fill_nodata()
         except Exception:
+            print('Could not fill nodata for HH band')
             pass
         try:
             self.HV.fill_nodata()
         except Exception:
+            print('Could not fill nodata for HV band')
             pass
 
 
