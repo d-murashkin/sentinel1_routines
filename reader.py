@@ -273,16 +273,16 @@ class Sentinel1Band(object):
         self.noise = None
         self.elevation_angle = None
 
-    def fill_nodata(self):
+    def fill_nodata(self, offset=3):
         """ extend lower part """
-        offset = 0
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
         for swath in swath_list:
             patches = sorted([item for item in self.scalloping_lut if item['swath'] == swath], key=lambda x: x['line_min'])
             patch = patches[-1]
             if patch['line_max'] < self.X - 1 - offset:
                 edge_line = patch['line_max'] - 1 - offset
-                self.data[edge_line + 1:, patch['sample_min'] - 0:patch['sample_max'] + 1] = np.flip(self.data[edge_line * 2 + 1 - self.X:edge_line, patch['sample_min'] - 0:patch['sample_max'] + 1], axis=0)
+                min_sample = patch['sample_min']
+                self.data[edge_line + 1:, min_sample:patch['sample_max'] + 1 + offset] = np.flip(self.data[edge_line * 2 + 1 - self.X:edge_line, min_sample:patch['sample_max'] + 1 + offset], axis=0)
 
         """ extend upper part """
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=False)
@@ -291,7 +291,9 @@ class Sentinel1Band(object):
             patch = patches[0]
             if patch['line_min'] > 0:
                 edge_line = patch['line_min'] + offset
-                self.data[:edge_line, patch['sample_min'] - 0:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, patch['sample_min'] - 0:patch['sample_max'] + 1], axis=0)
+                min_sample = patch['sample_min'] - offset
+                min_sample = 0 if min_sample < 0 else min_sample
+                self.data[:edge_line, min_sample:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, min_sample:patch['sample_max'] + 1], axis=0)
     
     def detect_borders(self):
         data = self.subtract_noise(in_place=False)
@@ -303,14 +305,14 @@ class Sentinel1Band(object):
         else:
             pass
 
-    def _find_border_coordinates(self, data, threshold_value):
+    def _find_border_coordinates(self, data, threshold_value, offset=5):
         vertical_quantile = np.quantile(data, 0.24, axis=0)
         try:
-            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + 3
+            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + offset
         except Exception:
             left_lim = 0
         try:
-            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - 4
+            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - (1 + offset)
         except Exception:
             right_lim = vertical_quantile.shape[0]
         return left_lim, right_lim
