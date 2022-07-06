@@ -18,10 +18,10 @@ def get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folde
     scene_name = scene_name.split('.')[0]
     try:
         date = scene_time(scene_name)
-    except:
+    except Exception:
         print('Could not recognize timestamp for {0}'.format(scene_name))
         return False
-    
+
     return get_date_folder(date, root_folder, ensure_existence, extra_folder)
 
 
@@ -36,7 +36,7 @@ def get_date_folder(date, root_folder, ensure_existence=True, extra_folder=''):
             if not os.path.exists(scene_folder):        # for python2 compatibility
                 os.makedirs(scene_folder)               #
 #            os.makedirs(scene_folder, exist_ok=True)
-        except:
+        except Exception:
             print('Could not create folders in {0}.'.format(root_folder))
             return False
 
@@ -51,14 +51,14 @@ def arrange_scene(scene_path, root_folder, copy=False, extra_folder=''):
     elif scene_name.split('_')[-1][-4:] != '.zip':
         """ This is not a zip archive, skip it. """
         return False
-    
+
     scene_folder = get_scene_folder(scene_name, root_folder, ensure_existence=True, extra_folder=extra_folder)
     try:
         if copy:
             shutil.copy(scene_path, scene_folder)
         else:
             shutil.move(scene_path, scene_folder)
-    except:
+    except Exception:
         return False
     return True
 

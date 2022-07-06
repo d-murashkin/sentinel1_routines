@@ -39,7 +39,7 @@ def create_list_of_products(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_da
         subprocess.call(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dhusget.sh') + ' -u {7} -p {8} -L {9} -m Sentinel-1 -c {0},{1}:{2},{3} -T GRD -F "*_GRDM_*" -S {5}T00:00:00.000Z -E {6}T00:00:00.000Z -l 100 -P {4}'.format(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, page, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), login, password, lock_folder), shell=True)
         try:
             df = pd.read_csv('products-list.csv', header=None, names=['name', 'address'])
-        except:
+        except Exception:
             break
         if df.empty:
             break
@@ -57,17 +57,17 @@ def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_dat
     if not ((type(start_date) == datetime.date) or (type(start_date) == datetime.datetime)) and ((type(end_date) == datetime.date) or (type(end_date) == datetime.date)):
         print('start_date and end_date are expected to be of the datetime.date or the datetime.datetime type.')
         return False
-    
+
     if not lock_folder:
         lock_folder = './dhusget_lock/'
     print('lock folder: {0}'.format(lock_folder))
-    
+
     dhusget = os.path.join(fld, 'dhusget.sh')
     shutil.copyfile(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dhusget.sh'), dhusget)
     st = os.stat(dhusget)
     try:
         os.chmod(dhusget, st.st_mode | stat.S_IEXEC)
-    except:
+    except Exception:
         "If Marcus owns the files, it's fine. Otherwise there is a problem with chmod."
         pass
     current_fld = os.getcwd()
@@ -82,7 +82,7 @@ def download_products(fld, llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, start_dat
         subprocess.call('./dhusget.sh -u {7} -p {8} -L {9} -m Sentinel-1 -c {0},{1}:{2},{3} -T GRD -F "*_GRDM_*" -S {5}T00:00:00.000Z -E {6}T00:00:00.000Z -l 100 -P {4} -n {10} -o product -D'.format(llcrnrlon, llcrnrlat, urcrnrlon, urcrnrlat, page, start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d'), login, password, lock_folder, n), shell=True)
         try:
             df = pd.read_csv('products-list.csv', header=None, names=['name', 'address'])
-        except:
+        except Exception:
             break
         if df.empty:
             break
@@ -137,7 +137,7 @@ def download_single_scene(scene_name, root_folder=False, output_folder='./', sho
 """
 
 
-def download_single_scene(scene_name, root_folder=False, output_folder='./'):
+def download_single_scene(scene_name, root_folder=False, output_folder='./', show_progress=True):
     scene_name = scene_name.split('.')[0]
     if not root_folder:
         download_path = output_folder
