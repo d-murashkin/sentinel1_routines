@@ -12,7 +12,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noi
     try:
         p = Sentinel1Product(input_path, scale_noise=scale_noise)
         p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
-    except:
+    except Exception:
         return False
     if band.lower() == 'hh':
         p.HH.clip_normalize()
@@ -24,7 +24,7 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noi
         try:
             import cv2
             img = cv2.bilateralFilter(img, 5, 15, 15)
-        except:
+        except Exception:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
     img *= 250
     img = img.astype(np.uint8) + 1
@@ -38,7 +38,7 @@ def rgb(input_path, output_path, speckle_filter=True, scale_noise=False, nodata_
     try:
         p = Sentinel1Product(input_path, scale_noise=scale_noise)
         p.read_data(keep_calibration_data=False, crop_borders=False, **kwargs)
-    except:
+    except Exception:
         print('Error reading {0}'.format(input_path))
         return False
     p.HH.clip_normalize(extend=False)
@@ -55,7 +55,7 @@ def rgb(input_path, output_path, speckle_filter=True, scale_noise=False, nodata_
         try:
             import cv2
             img = cv2.bilateralFilter(img, 5, 15, 15)
-        except:
+        except Exception:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
     img *= 250
     img = img.astype(np.uint8) + 1
@@ -69,7 +69,7 @@ def calibrated(input_path, output_path, save_incidence_angle=False, band='both',
     try:
         p = Sentinel1Product(input_path)
         p.read_data(keep_calibration_data=True, crop_borders=False, **kwargs)
-    except:
+    except Exception:
         print('Error reading {0}'.format(input_path))
         return False
 

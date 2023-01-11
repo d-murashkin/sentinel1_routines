@@ -111,7 +111,7 @@ class Sentinel1Band(object):
             self.noise *= 56065.87 * DN
 
         """ Second, take into account noise in the azimuth direction (if possible).
-            According https://qc.sentinel1.eo.esa.int/ipf/ only products taken after 13 March 2018 containg this information. """
+            According https://qc.sentinel1.eo.esa.int/ipf/ only products taken after 13 March 2018 contain this information. """
         if azimuth_noise:
             try:
                 self._read_azimuth_noise(noise_file)
@@ -122,6 +122,7 @@ class Sentinel1Band(object):
                 print('Failed to read azimuth noise for {0} (this is normal for Sentinel-1 scenes taken before 13 March 2018).'.format(self.noise_path))
 
     def scale_noise_patches(self):
+        cla = 1
         """ Calculate scale factors"""
         swath_list = sorted(list(set([item['swath'] for item in self.scalloping_lut])), reverse=True)
         for swath in swath_list:
@@ -135,7 +136,7 @@ class Sentinel1Band(object):
             next_noise = []
             pixel_count = []
             for patch in patches:
-                th = 300 if self.des == 'hv' else 1000
+                th = 300 if self.des == 'hv' else 700
                 nd = self.data[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3]
                 nd[nd > th] = th
                 if nd.sum() == 0:
@@ -148,7 +149,8 @@ class Sentinel1Band(object):
                 next_noise.append(self.noise[patch['line_min']:patch['line_max'], patch['sample_max'] + 1:patch['sample_max'] + 3].sum())
                 pixel_count.append(cd.size)
             size = sum(pixel_count)
-            scale = ((sum(curr_data) / size)**2 - (sum(next_data) / size)**2 + sum(next_noise) / size) / (sum(curr_noise) / size) * 0.9
+            scale = ((sum(curr_data) / size)**2 - (sum(next_data) / size)**2 + sum(next_noise) / size) / (sum(curr_noise) / size) * cla
+#            scale = ((sum(curr_data) / size) - (sum(next_data) / size) + sum(next_noise) / size) / (sum(curr_noise) / size) * cla
 
             """ Apply scale factor"""
             for patch in patches:
@@ -294,7 +296,7 @@ class Sentinel1Band(object):
                 min_sample = patch['sample_min'] - offset
                 min_sample = 0 if min_sample < 0 else min_sample
                 self.data[:edge_line, min_sample:patch['sample_max'] + 1] = np.flip(self.data[edge_line + 1:edge_line * 2 + 1, min_sample:patch['sample_max'] + 1], axis=0)
-    
+
     def detect_borders(self):
         data = self.subtract_noise(in_place=False)
         if self.des.lower() == 'hh':
@@ -413,7 +415,6 @@ class Sentinel1Product(object):
                 self.x_min, self.x_max = self.HV.left_lim, self.HV.right_lim
             if hasattr(self.HH, 'data'):
                 self.x_min, self.x_max = self.HH.left_lim, self.HH.right_lim
-
 
     def read_GCPs(self):
         """ Parse Ground Control Points (GCPs) from the annotation file.
