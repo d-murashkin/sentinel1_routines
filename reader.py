@@ -300,23 +300,25 @@ class Sentinel1Band(object):
     def detect_borders(self):
         data = self.subtract_noise(in_place=False)
         if self.des.lower() == 'hh':
-            self.left_lim, _ = self._find_border_coordinates(data, -32)
-            _, self.right_lim = self._find_border_coordinates(data, -27)
+            self.left_lim, _ = self._find_border_coordinates(data, -32, quantile_value=0.24)
+            _, self.right_lim = self._find_border_coordinates(data, -27, quantile_value=0.24)
         elif self.des.lower() == 'hv':
-            self.left_lim, self.right_lim = self._find_border_coordinates(data, -32)
+            self.left_lim, self.right_lim = self._find_border_coordinates(data, -32, quantile_value=0.74)
         else:
             pass
 
-    def _find_border_coordinates(self, data, threshold_value, offset=5):
-        vertical_quantile = np.quantile(data, 0.24, axis=0)
+    def _find_border_coordinates(self, data, threshold_value, quantile_value=0.24, offset=5):
+        vertical_quantile = np.quantile(data, quantile_value, axis=0)
         try:
-            left_lim = np.where(vertical_quantile[:200] < threshold_value, True, False).argmin() + offset
+            left_lim = 250 - np.flip(np.where(vertical_quantile[:250] < threshold_value, True, False)).argmin() + offset
+##        left_lim = np.sum(np.where(vertical_quantile[:200] < threshold_value, True, False)) + offset
         except Exception:
-            left_lim = 0
+            left_lim = offset
         try:
-            right_lim = vertical_quantile.shape[0] - np.flip(np.where(vertical_quantile[-200:] < threshold_value, True, False)).argmin() - (1 + offset)
+            right_lim = vertical_quantile.shape[0] - (200 - np.where(vertical_quantile[-200:] < threshold_value, True, False).argmax()) - (1 + offset)
+##        right_lim = vertical_quantile.shape[0] - np.sum(np.where(vertical_quantile[-200:] < threshold_value, True, False)) - (1 + offset)
         except Exception:
-            right_lim = vertical_quantile.shape[0]
+            right_lim = vertical_quantile.shape[0] - (1 + offset)
         return left_lim, right_lim
 
 
