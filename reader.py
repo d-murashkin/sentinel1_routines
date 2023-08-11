@@ -167,7 +167,7 @@ class Sentinel1Band(object):
                                 'swath': i[0].text} for i in noise_file[2]]
         """ Interpolate scalloping noise """
         self.azimuth_noise = np.zeros((self.X, self.Y), dtype=np.float32)
-        nodata_mask = np.ones((self.X, self.Y), dtype=np.bool)
+        nodata_mask = np.ones((self.X, self.Y), dtype=bool)
         for patch in self.scalloping_lut:
             if len(patch['noise']) == 1:
                 noise_line = np.repeat(patch['noise'][0], patch['line_max'] - patch['line_min'] + 1)
