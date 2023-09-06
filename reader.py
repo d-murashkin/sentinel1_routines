@@ -311,12 +311,10 @@ class Sentinel1Band(object):
         vertical_quantile = np.quantile(data, quantile_value, axis=0)
         try:
             left_lim = 250 - np.flip(np.where(vertical_quantile[:250] < threshold_value, True, False)).argmin() + offset
-##        left_lim = np.sum(np.where(vertical_quantile[:200] < threshold_value, True, False)) + offset
         except Exception:
             left_lim = offset
         try:
             right_lim = vertical_quantile.shape[0] - (200 - np.where(vertical_quantile[-200:] < threshold_value, True, False).argmax()) - (1 + offset)
-##        right_lim = vertical_quantile.shape[0] - np.sum(np.where(vertical_quantile[-200:] < threshold_value, True, False)) - (1 + offset)
         except Exception:
             right_lim = vertical_quantile.shape[0] - (1 + offset)
         return left_lim, right_lim
@@ -443,7 +441,17 @@ class Sentinel1Product(object):
         return True
 
     def interpolate_GCP_parameter(self, parameter, gcps_per_line=21):
-        """ Calculate coordinates for every pixel.
+        """ Calculate one of the following parameters for every pixel:
+            'azimuth_time'
+            'slant_range_time'
+            'line'
+            'pixel'
+            'latitude'
+            'longitude'
+            'height'
+            'incidence_angle'
+            'elevation_angle'
+
             Geolocation grid is interpolated linearly.
             Normally *gcps_per_line* should not be modified.
             Here it is assumed that there are always 21 geopoints per azimuth line.
@@ -594,6 +602,37 @@ class Sentinel1Product(object):
         except Exception:
             print('Could not fill nodata for HV band')
             pass
+    
+    def mask_land(self, custom_library=False):
+        """ Function creates a boolean array under self.landmask with land mask.
+            It relies on the *basemap* library.
+            read_data() must be called before mask_land().
+            set custom_library=True if the *landmask* library from IUP repo should be used
+            instead of *basemap* """
+        if not hasattr(self, 'latitude'):
+            self.interpolate_latitude()
+        if not hasattr(self, 'longitude'):
+            self.interpolate_longitude()
+        if not custom_library:
+            try:
+                from mpl_toolkits import basemap
+            except Exception:
+                print('Install basemap library')
+                return False
+
+            masked_array = basemap.maskoceans(self.longitude, self.latitude,
+                                              np.zeros_like(self.longitude, dtype=np.uint8),
+                                              resolution='f', grid=1.25, inlands=False)
+        else:
+            try:
+                from landmask import maskoceans
+            except Exception:
+                print('landmask library is not found.')
+                return False
+            masked_array = maskoceans(self.longitude, self.latitude,
+                                      np.zeros_like(self.longitude, dtype=np.uint8),
+                                      resolution='f', grid=0.75, inlands=False)
+        self.landmask = ~masked_array.mask
 
 
 def _read_single_band(band, keep_calibration_data=True):
