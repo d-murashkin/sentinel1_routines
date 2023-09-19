@@ -613,25 +613,18 @@ class Sentinel1Product(object):
             self.interpolate_latitude()
         if not hasattr(self, 'longitude'):
             self.interpolate_longitude()
-        if not custom_library:
+        
+        try:
+            from landmask import maskoceans
+        except ImportError:
             try:
-                from mpl_toolkits import basemap
-            except Exception:
-                print('Install basemap library')
-                return False
+                from mpl_toolkits.basemap import maskoceans
+            except ImportError:
+                print("Neither the landmask nor the basemap library found")
 
-            masked_array = basemap.maskoceans(self.longitude, self.latitude,
-                                              np.zeros_like(self.longitude, dtype=np.uint8),
-                                              resolution='f', grid=1.25, inlands=False)
-        else:
-            try:
-                from landmask import maskoceans
-            except Exception:
-                print('landmask library is not found.')
-                return False
-            masked_array = maskoceans(self.longitude, self.latitude,
-                                      np.zeros_like(self.longitude, dtype=np.uint8),
-                                      resolution='f', grid=0.75, inlands=False)
+        masked_array = maskoceans(self.longitude, self.latitude,
+                                  np.zeros_like(self.longitude, dtype=np.uint8),
+                                  resolution='f', grid=0.75, inlands=False)
         self.landmask = ~masked_array.mask
 
 
