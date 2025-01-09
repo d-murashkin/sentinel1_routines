@@ -113,7 +113,7 @@ def calibrated(input_path, output_path, scale_noise=False, speckle_filter=False,
         p.mask_land()
         data = np.dstack([data, ~p.landmask])
 
-    write_data_geotiff(data, output_path, p.gdal_data, nodata_val=np.NaN)
+    write_data_geotiff(data, output_path, p.gdal_data, nodata_val=np.nan)
     return True
 
 
