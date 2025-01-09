@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', default='db', help='type of the output: RGB / grayscale / dB (default)')
     parser.add_argument('-i', required=True, help='input file (Sentinel-1 scene)')
     parser.add_argument('-o', default='', help='output folder')
-    parser.add_argument('-c', default='hh', help='channel, hh (default) or hv, if grayscale type is chosen')
+    parser.add_argument('-c', default='both', help='channel, "both" (default), hh or hv, if grayscale type is chosen')
     parser.add_argument('-f', action='store_true', help='apply speckle noise filter (bilateral fiter, 5 pixel size)')
     parser.add_argument('-iac', action='store_true', help='apply incidence angle correction (for sea ice)')
     parser.add_argument('-p', action='store_true', help='parallel=True')
@@ -67,6 +67,7 @@ if __name__ == "__main__":
         case 'db':
             calibrated(path_to_scene,
                        output,
+                       channel=args.c,
                        speckle_filter=args.f,
                        incidence_angle_correction=args.iac,
                        parallel=args.p,
