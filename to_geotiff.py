@@ -14,21 +14,26 @@ def grayscale(input_path, output_path, band='hh', speckle_filter=True, scale_noi
         p.read_data(keep_calibration_data=False, crop_borders=True, **kwargs)
     except Exception:
         return False
-    if band.lower() == 'hh':
-        p.HH.clip_normalize()
-        img = p.HH.data
-    elif band.lower() == 'hv':
-        p.HV.clip_normalize()
-        img = p.HV.data
+    
+    imgs = []
+    if (band.lower() == 'both') or (band.lower() == 'hh'):
+        p.HH.clip_normalize(extend=False)
+        imgs.append(p.HH.data)
+    if (band.lower() == 'both') or (band.lower() == 'hv'):
+        p.HV.clip_normalize(extend=False)
+        imgs.append(p.HV.data)
+    
     if speckle_filter:
         try:
             import cv2
-            img = cv2.bilateralFilter(img, 5, 15, 15)
+            for img in imgs:
+                img = cv2.bilateralFilter(img, 5, 15, 15)
         except Exception:
             print('Failed to apply speckle filter (bilateral filter from opencv).')
-    img *= 250
-    img = img.astype(np.uint8) + 1
-    write_data_geotiff(img, output_path, p.gdal_data, nodata_val=nodata_value)
+    for img in imgs:
+        img *= 250
+        img = img.astype(np.uint8) + 1
+    write_data_geotiff(np.stack(imgs, axis=-1), output_path, p.gdal_data, nodata_val=nodata_value)
     return True
 
 
